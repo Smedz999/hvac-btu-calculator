@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HVAC BTU Calculator | Professional AC Sizing Tool</title>
+  <style>
+    :root {
+      --primary: #0f4c81;
+      --primary-dark: #0a3356;
+      --primary-light: #e6f0f8;
+      --accent: #00a896;
+      --accent-dark: #008c7a;
+      --warning: #f59e0b;
+      --danger: #dc2626;
+      --text: #1f2937;
+      --text-light: #6b7280;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --shadow: 0 10px 40px rgba(15, 76, 129, 0.12);
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      padding: 2rem 1rem;
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 1.875rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      opacity: 0.9;
+      max-width: 600px;
+      margin: 0 auto;
+      font-size: 1rem;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (min-width: 900px) {
+      .grid {
+        grid-template-columns: 1.1fr 0.9fr;
+        align-items: start;
+      }
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      padding: 1.75rem;
+    }
+
+    .card h2 {
+      font-size: 1.25rem;
+      margin-bottom: 1.25rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 0.4rem;
+      color: var(--text);
+    }
+
+    .hint {
+      font-size: 0.8rem;
+      color: var(--text-light);
+      font-weight: 400;
+      margin-left: 0.25rem;
+    }
+
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      color: var(--text);
+      background: white;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input[type="number"]:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
+    }
+
+    .unit-toggle {
+      display: inline-flex;
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 0.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .unit-toggle button {
+      border: none;
+      background: transparent;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      color: var(--text-light);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .unit-toggle button.active {
+      background: white;
+      color: var(--primary);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 480px) {
+      .row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      padding: 1rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.2s, background 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+      color: white;
+      box-shadow: 0 4px 14px rgba(0, 168, 150, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0, 168, 150, 0.35);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: var(--primary);
+      border: 2px solid var(--primary);
+    }
+
+    .btn-secondary:hover {
+      background: var(--primary-light);
+    }
+
+    .result-box {
+      background: linear-gradient(135deg, var(--primary-light) 0%, #f0f9ff 100%);
+      border: 2px solid rgba(15, 76, 129, 0.15);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      text-align: center;
+      margin-bottom: 1.5rem;
+      display: none;
+    }
+
+    .result-box.visible {
+      display: block;
+      animation: fadeIn 0.4s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-label {
+      font-size: 0.875rem;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .result-btu {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--primary);
+      line-height: 1.1;
+    }
+
+    .result-kw {
+      font-size: 1.125rem;
+      color: var(--text);
+      margin-top: 0.25rem;
+    }
+
+    .result-unit {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent-dark);
+      margin-top: 0.75rem;
+      padding: 0.5rem 1rem;
+      background: white;
+      border-radius: 8px;
+      display: inline-block;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .breakdown {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1.25rem;
+      font-size: 0.9rem;
+      text-align: left;
+    }
+
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .breakdown-row:last-child {
+      border-bottom: none;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .lead-card {
+      background: linear-gradient(135deg, #fff9f0 0%, #fff4e0 100%);
+      border: 2px solid rgba(245, 158, 11, 0.25);
+    }
+
+    .lead-card h2 {
+      color: #b45309;
+    }
+
+    .lead-card input {
+      margin-bottom: 0.75rem;
+    }
+
+    .trust-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      font-size: 0.8rem;
+      color: var(--text-light);
+    }
+
+    .trust-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .explanation {
+      margin-top: 1.5rem;
+    }
+
+    .explanation h3 {
+      font-size: 1.1rem;
+      color: var(--primary);
+      margin-bottom: 0.75rem;
+    }
+
+    .explanation ul {
+      padding-left: 1.25rem;
+      color: var(--text-light);
+      font-size: 0.95rem;
+    }
+
+    .explanation li {
+      margin-bottom: 0.5rem;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(120%);
+      background: var(--text);
+      color: white;
+      padding: 0.875rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      transition: transform 0.3s ease;
+      z-index: 1000;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--text-light);
+      font-size: 0.875rem;
+    }
+
+    .error {
+      border-color: var(--danger) !important;
+      background: #fff5f5 !important;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>⚙️ HVAC BTU Calculator</h1>
+    <p>Professional air conditioning sizing tool for installers, contractors, and homeowners. Get an accurate BTU estimate in seconds.</p>
+  </header>
+
+  <main class="container">
+    <div class="grid">
+      <!-- Calculator -->
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
+          <h2 style="margin:0;">Room Details</h2>
+          <div class="unit-toggle">
+            <button type="button" id="btnMetric" class="active" onclick="setUnit('metric')">Metric (m)</button>
+            <button type="button" id="btnImperial" onclick="setUnit('imperial')">Imperial (ft)</button>
+          </div>
+        </div>
+
+        <form id="btuForm" onsubmit="event.preventDefault(); calculate();">
+          <div class="row">
+            <div class="form-group">
+              <label for="length">Length <span class="unit-label">(m)</span></label>
+              <input type="number" id="length" step="0.01" min="0.1" placeholder="e.g. 5.5" required />
+            </div>
+            <div class="form-group">
+              <label for="width">Width <span class="unit-label">(m)</span></label>
+              <input type="number" id="width" step="0.01" min="0.1" placeholder="e.g. 4.2" required />
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="form-group">
+              <label for="height">Ceiling Height <span class="unit-label">(m)</span></label>
+              <input type="number" id="height" step="0.01" min="1" placeholder="e.g. 2.7" required />
+            </div>
+            <div class="form-group">
+              <label for="occupants">Occupants <span class="hint">people regularly in room</span></label>
+              <input type="number" id="occupants" min="1" value="2" required />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="insulation">Insulation Quality</label>
+            <select id="insulation" required>
+              <option value="poor">Poor — single glazing, uninsulated walls</option>
+              <option value="average" selected>Average — some insulation, standard windows</option>
+              <option value="good">Good — double glazing, well insulated</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="sunExposure">Sun Exposure</label>
+            <select id="sunExposure" required>
+              <option value="shady">Shady — north facing or heavily shaded</option>
+              <option value="moderate" selected>Moderate — partial sun during the day</option>
+              <option value="sunny">Sunny — south/west facing, full afternoon sun</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="roomType">Room Type</label>
+            <select id="roomType" required>
+              <option value="bedroom">Bedroom</option>
+              <option value="living" selected>Living Room / Lounge</option>
+              <option value="kitchen">Kitchen</option>
+              <option value="office">Office / Study</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Calculate BTU Requirement</button>
+        </form>
+
+        <div class="explanation">
+          <h3>How it works</h3>
+          <ul>
+            <li><strong>Base load</strong> is calculated from floor area using industry-standard BTU per square metre/foot values.</li>
+            <li><strong>Ceiling height</strong> adjusts for air volume — higher ceilings need more cooling power.</li>
+            <li><strong>Insulation, sun exposure, and room type</strong> apply percentage modifiers based on typical heat gain.</li>
+            <li><strong>Occupants</strong> add ~600 BTU per person beyond the first two.</li>
+            <li>The final result is rounded up to the nearest standard residential AC unit size.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Results + Lead Capture -->
+      <section>
+        <div class="card result-box" id="resultBox">
+          <div class="result-label">Estimated Cooling Requirement</div>
+          <div class="result-btu" id="resultBtu">—</div>
+          <div class="result-kw" id="resultKw">—</div>
+          <div class="result-unit" id="resultUnit">—</div>
+
+          <div class="breakdown" id="breakdown">
+            <!-- Populated by JS -->
+          </div>
+
+          <button type="button" class="btn btn-secondary" style="margin-top:1.25rem;" onclick="shareResult()">🔗 Share Result</button>
+        </div>
+
+        <div class="card lead-card">
+          <h2>📬 Get 3 Quotes from Local AC Installers</h2>
+          <p style="font-size:0.95rem;color:var(--text-light);margin-bottom:1rem;">Enter your details and we'll connect you with up to 3 verified HVAC contractors in your area.</p>
+          <form id="leadForm" onsubmit="event.preventDefault(); submitLead();">
+            <input type="text" id="leadName" placeholder="Your name" required />
+            <input type="email" id="leadEmail" placeholder="Email address" required />
+            <input type="text" id="leadPostcode" placeholder="Postcode / ZIP" required />
+            <button type="submit" class="btn btn-primary">Get Free Quotes</button>
+          </form>
+          <div class="trust-badges">
+            <span class="trust-badge">✅ Verified installers</span>
+            <span class="trust-badge">🔒 No spam</span>
+            <span class="trust-badge">⚡ Free & fast</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <p>HVAC BTU Calculator — For estimation purposes only. A professional Manual J load calculation is recommended for final equipment selection.</p>
+  </footer>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let currentUnit = 'metric';
+    let lastResult = null;
+
+    const standardSizes = [5000, 6000, 8000, 9000, 10000, 12000, 14000, 15000, 18000, 20000, 22000, 24000, 28000, 30000, 36000, 42000, 48000, 60000];
+
+    const unitLabels = document.querySelectorAll('.unit-label');
+    const unitPlaceholders = {
+      metric: { length: '5.5', width: '4.2', height: '2.7' },
+      imperial: { length: '18', width: '14', height: '9' }
+    };
+
+    function setUnit(unit) {
+      currentUnit = unit;
+      document.getElementById('btnMetric').classList.toggle('active', unit === 'metric');
+      document.getElementById('btnImperial').classList.toggle('active', unit === 'imperial');
+
+      const suffix = unit === 'metric' ? '(m)' : '(ft)';
+      unitLabels.forEach(el => el.textContent = suffix);
+
+      document.getElementById('length').placeholder = unitPlaceholders[unit].length;
+      document.getElementById('width').placeholder = unitPlaceholders[unit].width;
+      document.getElementById('height').placeholder = unitPlaceholders[unit].height;
+
+      // Clear previous result to avoid confusion
+      document.getElementById('resultBox').classList.remove('visible');
+    }
+
+    function getStandardSize(btu) {
+      for (const size of standardSizes) {
+        if (size >= btu) return size;
+      }
+      return Math.ceil(btu / 12000) * 12000;
+    }
+
+    function formatNumber(num) {
+      return num.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    }
+
+    function calculate() {
+      const length = parseFloat(document.getElementById('length').value);
+      const width = parseFloat(document.getElementById('width').value);
+      const height = parseFloat(document.getElementById('height').value);
+      const occupants = parseInt(document.getElementById('occupants').value, 10);
+      const insulation = document.getElementById('insulation').value;
+      const sunExposure = document.getElementById('sunExposure').value;
+      const roomType = document.getElementById('roomType').value;
+
+      // Validation
+      let hasError = false;
+      ['length', 'width', 'height', 'occupants'].forEach(id => {
+        const el = document.getElementById(id);
+        const val = parseFloat(el.value);
+        if (isNaN(val) || val <= 0) {
+          el.classList.add('error');
+          hasError = true;
+        } else {
+          el.classList.remove('error');
+        }
+      });
+
+      if (hasError) {
+        showToast('Please enter valid positive numbers for all dimensions.');
+        return;
+      }
+
+      // Convert to metric if needed
+      let mLength = length, mWidth = width, mHeight = height;
+      if (currentUnit === 'imperial') {
+        mLength *= 0.3048;
+        mWidth *= 0.3048;
+        mHeight *= 0.3048;
+      }
+
+      const areaM2 = mLength * mWidth;
+      const areaSqFt = areaM2 * 10.7639;
+
+      // Base BTU calculation: 220 BTU/m² or ~20.4 BTU/sq ft
+      let baseBtu = areaM2 * 220;
+
+      // Ceiling height adjustment (baseline 2.5m / 8ft)
+      const heightFactor = mHeight / 2.5;
+      let ceilingAdjustment = baseBtu * (heightFactor - 1);
+
+      // Insulation modifier
+      const insulationModifiers = {
+        poor: 0.20,
+        average: 0.00,
+        good: -0.15
+      };
+      let insulationAdjustment = baseBtu * insulationModifiers[insulation];
+
+      // Sun exposure modifier
+      const sunModifiers = {
+        shady: -0.10,
+        moderate: 0.00,
+        sunny: 0.15
+      };
+      let sunAdjustment = baseBtu * sunModifiers[sunExposure];
+
+      // Room type modifier
+      const roomModifiers = {
+        bedroom: -0.10,
+        living: 0.00,
+        kitchen: 0.25,
+        office: 0.10
+      };
+      let roomAdjustment = baseBtu * roomModifiers[roomType];
+
+      // Occupants: 600 BTU per person beyond first 2
+      const occupantAdjustment = Math.max(0, occupants - 2) * 600;
+
+      let totalBtu = baseBtu + ceilingAdjustment + insulationAdjustment + sunAdjustment + roomAdjustment + occupantAdjustment;
+      totalBtu = Math.max(5000, totalBtu);
+
+      const standardBtu = getStandardSize(totalBtu);
+      const kw = totalBtu * 0.00029307107;
+
+      lastResult = {
+        btu: Math.round(totalBtu),
+        standardBtu: standardBtu,
+        kw: kw,
+        areaM2: areaM2,
+        areaSqFt: areaSqFt,
+        breakdown: {
+          base: baseBtu,
+          ceiling: ceilingAdjustment,
+          insulation: insulationAdjustment,
+          sun: sunAdjustment,
+          room: roomAdjustment,
+          occupants: occupantAdjustment
+        }
+      };
+
+      // Render
+      document.getElementById('resultBtu').textContent = `${formatNumber(lastResult.btu)} BTU/hr`;
+      document.getElementById('resultKw').textContent = `≈ ${lastResult.kw.toFixed(2)} kW cooling capacity`;
+      document.getElementById('resultUnit').textContent = `Recommended: ${formatNumber(standardBtu)} BTU unit`;
+
+      const breakdownEl = document.getElementById('breakdown');
+      breakdownEl.innerHTML = `
+        <div class="breakdown-row"><span>Floor area</span><span>${areaM2.toFixed(1)} m² (${areaSqFt.toFixed(0)} sq ft)</span></div>
+        <div class="breakdown-row"><span>Base cooling load</span><span>+${formatNumber(baseBtu)} BTU</span></div>
+        <div class="breakdown-row"><span>Ceiling height adjustment</span><span>${ceilingAdjustment >= 0 ? '+' : ''}${formatNumber(ceilingAdjustment)} BTU</span></div>
+        <div class="breakdown-row"><span>Insulation adjustment</span><span>${insulationAdjustment >= 0 ? '+' : ''}${formatNumber(insulationAdjustment)} BTU</span></div>
+        <div class="breakdown-row"><span>Sun exposure adjustment</span><span>${sunAdjustment >= 0 ? '+' : ''}${formatNumber(sunAdjustment)} BTU</span></div>
+        <div class="breakdown-row"><span>Room type adjustment</span><span>${roomAdjustment >= 0 ? '+' : ''}${formatNumber(roomAdjustment)} BTU</span></div>
+        <div class="breakdown-row"><span>Occupants (${occupants})</span><span>+${formatNumber(occupantAdjustment)} BTU</span></div>
+        <div class="breakdown-row"><span>Estimated requirement</span><span>${formatNumber(lastResult.btu)} BTU</span></div>
+      `;
+
+      document.getElementById('resultBox').classList.add('visible');
+      document.getElementById('resultBox').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    async function shareResult() {
+      const text = lastResult
+        ? `My HVAC BTU estimate: ${formatNumber(lastResult.btu)} BTU/hr (${lastResult.kw.toFixed(2)} kW). Recommended unit: ${formatNumber(lastResult.standardBtu)} BTU.`
+        : 'Check out this HVAC BTU Calculator for sizing your air conditioner.';
+      const url = window.location.href;
+      const shareData = { title: 'HVAC BTU Calculator', text, url };
+
+      if (navigator.share) {
+        try {
+          await navigator.share(shareData);
+          return;
+        } catch (err) {
+          // Fallback
+        }
+      }
+
+      // Fallback to clipboard
+      try {
+        await navigator.clipboard.writeText(`${text} ${url}`);
+        showToast('Result copied to clipboard');
+      } catch (err) {
+        showToast('Sharing not supported in this browser');
+      }
+    }
+
+    function submitLead() {
+      const name = document.getElementById('leadName').value.trim();
+      const email = document.getElementById('leadEmail').value.trim();
+      const postcode = document.getElementById('leadPostcode').value.trim();
+
+      if (!name || !email || !postcode) {
+        showToast('Please complete all fields.');
+        return;
+      }
+
+      // In a real deployment, send this to your backend/CRM
+      console.log('Lead submitted:', { name, email, postcode, result: lastResult });
+      showToast('Thanks! Your quote request has been submitted.');
+      document.getElementById('leadForm').reset();
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+  </script>
+</body>
+</html>
