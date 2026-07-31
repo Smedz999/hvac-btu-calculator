@@ -4,6 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HVAC BTU Calculator | Professional AC Sizing Tool</title>
+
+  <!-- Google Analytics 4: replace G-XXXXXXXXXX below with your real Measurement ID -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-XXXXXXXXXX');
+
+    // Non-blocking helper to safely fire GA4 events
+    function trackEvent(name, params) {
+      if (typeof gtag === 'function') {
+        gtag('event', name, params || {});
+      }
+    }
+  </script>
+
   <style>
     :root {
       --primary: #0f4c81;
@@ -372,12 +389,12 @@
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
           <h2 style="margin:0;">Room Details</h2>
           <div class="unit-toggle">
-            <button type="button" id="btnMetric" class="active" onclick="setUnit('metric')">Metric (m)</button>
-            <button type="button" id="btnImperial" onclick="setUnit('imperial')">Imperial (ft)</button>
+            <button type="button" id="btnMetric" class="active" onclick="setUnit('metric', true)">Metric (m)</button>
+            <button type="button" id="btnImperial" onclick="setUnit('imperial', true)">Imperial (ft)</button>
           </div>
         </div>
 
-        <form id="btuForm" onsubmit="event.preventDefault(); calculate();">
+        <form id="btuForm" onsubmit="event.preventDefault(); calculate(true);">
           <div class="row">
             <div class="form-group">
               <label for="length">Length <span class="unit-label">(m)</span></label>
@@ -455,7 +472,7 @@
             <!-- Populated by JS -->
           </div>
 
-          <button type="button" class="btn btn-secondary" style="margin-top:1.25rem;" onclick="shareResult()">🔗 Share Result</button>
+          <button type="button" class="btn btn-secondary" style="margin-top:1.25rem;" onclick="shareResult(true)">🔗 Share Result</button>
         </div>
 
         <div class="card lead-card">
@@ -465,7 +482,7 @@
             <input type="text" id="leadName" placeholder="Your name" required />
             <input type="email" id="leadEmail" placeholder="Email address" required />
             <input type="text" id="leadPostcode" placeholder="Postcode / ZIP" required />
-            <button type="submit" class="btn btn-primary">Get Free Quotes</button>
+            <button type="submit" class="btn btn-primary" onclick="trackLeadStart()">Get Free Quotes</button>
           </form>
           <div class="trust-badges">
             <span class="trust-badge">✅ Verified installers</span>
@@ -495,7 +512,7 @@
       imperial: { length: '18', width: '14', height: '9' }
     };
 
-    function setUnit(unit) {
+    function setUnit(unit, userAction) {
       currentUnit = unit;
       document.getElementById('btnMetric').classList.toggle('active', unit === 'metric');
       document.getElementById('btnImperial').classList.toggle('active', unit === 'imperial');
@@ -509,6 +526,11 @@
 
       // Clear previous result to avoid confusion
       document.getElementById('resultBox').classList.remove('visible');
+
+      // Track unit toggle only when triggered by a user click
+      if (userAction) {
+        trackEvent('unit_toggle', { unit: unit });
+      }
     }
 
     function getStandardSize(btu) {
@@ -522,7 +544,7 @@
       return num.toLocaleString(undefined, { maximumFractionDigits: 0 });
     }
 
-    function calculate() {
+    function calculate(userAction) {
       const length = parseFloat(document.getElementById('length').value);
       const width = parseFloat(document.getElementById('width').value);
       const height = parseFloat(document.getElementById('height').value);
@@ -636,9 +658,17 @@
 
       document.getElementById('resultBox').classList.add('visible');
       document.getElementById('resultBox').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      if (userAction) {
+        trackEvent('calculate_btu', {
+          unit: currentUnit,
+          btu: lastResult.btu,
+          standard_btu: lastResult.standardBtu
+        });
+      }
     }
 
-    async function shareResult() {
+    async function shareResult(userAction) {
       const text = lastResult
         ? `My HVAC BTU estimate: ${formatNumber(lastResult.btu)} BTU/hr (${lastResult.kw.toFixed(2)} kW). Recommended unit: ${formatNumber(lastResult.standardBtu)} BTU.`
         : 'Check out this HVAC BTU Calculator for sizing your air conditioner.';
@@ -648,10 +678,16 @@
       if (navigator.share) {
         try {
           await navigator.share(shareData);
-          return;
         } catch (err) {
           // Fallback
         }
+      }
+
+      if (userAction) {
+        trackEvent('share_result', {
+          btu: lastResult ? lastResult.btu : null,
+          standard_btu: lastResult ? lastResult.standardBtu : null
+        });
       }
 
       // Fallback to clipboard
@@ -676,6 +712,11 @@
       // In a real deployment, send this to your backend/CRM
       console.log('Lead submitted:', { name, email, postcode, result: lastResult });
       showToast('Thanks! Your quote request has been submitted.');
+
+      trackEvent('lead_form_submit', {
+        has_result: !!lastResult
+      });
+
       document.getElementById('leadForm').reset();
     }
 
@@ -684,6 +725,12 @@
       toast.textContent = message;
       toast.classList.add('show');
       setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    function trackLeadStart() {
+      // Fired from the lead-form submit button to indicate intent before validation.
+      // Also fires on every submit attempt; combine with lead_form_submit for funnel analysis.
+      trackEvent('lead_form_start', { has_result: !!lastResult });
     }
   </script>
 </body>
