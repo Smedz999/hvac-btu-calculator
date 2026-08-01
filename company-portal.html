@@ -622,7 +622,7 @@ const API_URL = window.location.hostname === 'localhost'
 // Fallback: if API fails, use localStorage
 let useLocalFallback = false;
 
-const STRIPE_KEY = 'pk_test_YOUR_STRIPE_KEY'; // TODO: Replace with your Stripe publishable key
+const STRIPE_KEY = 'pk_test_51TzjYlJp1KyOxEczDXQokcXcjTzVmamZAT6tkUPdWs3WoPbM7HwZynD3vA2f3wJNQDOnQnfn3vD8iLNPQbWxCCwF00bXJAgcoN'; // TODO: Replace with your Stripe publishable key
 
 // =====================
 // STATE
@@ -971,7 +971,7 @@ function showPayment(packageId) {
   document.getElementById('paymentModal').classList.add('active');
 
   // Initialize Stripe if not already done
-  if (!stripe && STRIPE_KEY !== 'pk_test_YOUR_STRIPE_KEY') {
+  if (!stripe && STRIPE_KEY !== 'pk_test_51TzjYlJp1KyOxEczDXQokcXcjTzVmamZAT6tkUPdWs3WoPbM7HwZynD3vA2f3wJNQDOnQnfn3vD8iLNPQbWxCCwF00bXJAgcoN') {
     stripe = Stripe(STRIPE_KEY);
     const elements = stripe.elements();
     cardElement = elements.create('card', { style: { base: { fontSize: '16px' } } });
@@ -988,7 +988,7 @@ async function processPayment() {
   if (!selectedPackage) return;
 
   // If Stripe is not configured, fall back to demo mode
-  if (STRIPE_KEY === 'pk_test_YOUR_STRIPE_KEY') {
+  if (STRIPE_KEY === 'pk_test_51TzjYlJp1KyOxEczDXQokcXcjTzVmamZAT6tkUPdWs3WoPbM7HwZynD3vA2f3wJNQDOnQnfn3vD8iLNPQbWxCCwF00bXJAgcoN') {
     // Demo mode: add credits immediately
     currentUser.credits = (currentUser.credits || 0) + selectedPackage.credits;
     

@@ -1,0 +1,5 @@
+✅ Resend initialized
+🚀 HVAC Lead Pro API running on port 3001
+📊 Health check: http://localhost:3001/api/health
+💳 Stripe: ⚠️ Not configured (add STRIPE_SECRET_KEY)
+📧 Resend: ✅ Connected
