@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Follow-Up - HVAC Lead Pro</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background: #f8fafc; }
+    .container { max-width: 600px; margin: 0 auto; background: white; }
+    .header { background: linear-gradient(135deg, #0f4c81 0%, #0a3356 100%); padding: 30px; text-align: center; }
+    .header h1 { color: white; margin: 0; font-size: 24px; }
+    .content { padding: 35px 30px; }
+    .highlight { background: #fff9f0; border-left: 4px solid #f59e0b; padding: 15px 20px; margin: 20px 0; }
+    .cta { text-align: center; margin: 30px 0; }
+    .btn { display: inline-block; background: linear-gradient(135deg, #00a896 0%, #008c7a 100%); color: white; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 700; }
+    .footer { background: #1f2937; color: white; padding: 25px; text-align: center; font-size: 14px; }
+    .footer a { color: #00a896; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Quick Follow-Up</h1>
+    </div>
+
+    <div class="content">
+      <p>Hi {{company_name}},</p>
+
+      <p>I reached out a few days ago about <strong>HVAC Lead Pro</strong> and wanted to make sure you saw it.</p>
+
+      <div class="highlight">
+        <strong>We're already sending leads to contractors in {{city}}.</strong> I wanted to give you the chance to join before your area fills up — we max at 3 companies per postcode.
+      </div>
+
+      <p><strong>Recent lead example:</strong></p>
+      <ul>
+        <li>Customer: Sarah M., {{postcode_example}}</li>
+        <li>BTU Required: 12,000</li>
+        <li>Room: Living room, 24m²</li>
+        <li>Result: Contacted within 10 minutes, quote accepted same day</li>
+      </ul>
+
+      <p>That lead cost the contractor <strong>£4</strong> and turned into a <strong>£2,400 installation</strong>.</p>
+
+      <div class="cta">
+        <a href="https://hvac-calculator-opal.vercel.app/for-contractors.html" class="btn">Join Free →</a>
+      </div>
+
+      <p>No commitment. Register free, see how it works, buy credits when you're ready.</p>
+
+      <p>Best,<br>Lee</p>
+    </div>
+
+    <div class="footer">
+      <p><a href="https://hvac-calculator-opal.vercel.app">HVAC Lead Pro</a></p>
+    </div>
+  </div>
+</body>
+</html>
