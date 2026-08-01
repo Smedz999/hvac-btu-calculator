@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HVAC Lead Pro — Contractor CRM</title>
+  <style>
+    :root {
+      --primary: #0f4c81;
+      --primary-dark: #0a3356;
+      --accent: #00a896;
+      --accent-dark: #008c7a;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --danger: #dc2626;
+      --text: #1f2937;
+      --text-light: #6b7280;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --shadow: 0 10px 40px rgba(15, 76, 129, 0.12);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .nav {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-brand { font-size: 1.25rem; font-weight: 800; }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0.5rem;
+    }
+
+    .tab {
+      padding: 0.5rem 1rem;
+      border: none;
+      background: none;
+      font-weight: 600;
+      color: var(--text-light);
+      cursor: pointer;
+      border-radius: 6px;
+    }
+
+    .tab.active { color: var(--primary); background: var(--primary-light); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1.25rem;
+      color: var(--primary);
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: var(--accent-dark); }
+    .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-warning { background: var(--warning); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      font-weight: 700;
+      color: var(--primary);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    tr:hover { background: var(--bg); }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-new { background: #dbeafe; color: #1e40af; }
+    .badge-contacted { background: #fef3c7; color: #92400e; }
+    .badge-interested { background: #d1fae5; color: #065f46; }
+    .badge-registered { background: #c7d2fe; color: #3730a3; }
+    .badge-customer { background: #d1fae5; color: #065f46; }
+
+    .search-box {
+      padding: 0.5rem 1rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      width: 250px;
+    }
+
+    .search-box:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.85rem;
+      margin-bottom: 0.3rem;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+      background: white;
+      border-radius: var(--radius);
+      max-width: 600px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 2rem;
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--text-light);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      padding: 1.25rem;
+      text-align: center;
+    }
+
+    .stat-value { font-size: 2rem; font-weight: 800; color: var(--primary); }
+    .stat-label { color: var(--text-light); font-size: 0.85rem; }
+
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--text);
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      transform: translateX(150%);
+      transition: transform 0.3s ease;
+      z-index: 2000;
+    }
+
+    .toast.show { transform: translateX(0); }
+    .toast.success { background: var(--success); }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-brand">⚡ HVAC Lead Pro — CRM</div>
+  <div style="display:flex;gap:1rem;">
+    <a href="admin.html" style="color:rgba(255,255,255,0.8);text-decoration:none;">← Admin</a>
+    <a href="index.html" style="color:rgba(255,255,255,0.8);text-decoration:none;">Calculator</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <h1 style="margin-bottom:1.5rem;">Contractor Outreach CRM</h1>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value" id="statTotal">0</div>
+      <div class="stat-label">Total Prospects</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statContacted">0</div>
+      <div class="stat-label">Contacted</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statInterested">0</div>
+      <div class="stat-label">Interested</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statRegistered">0</div>
+      <div class="stat-label">Registered</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statCustomer">0</div>
+      <div class="stat-label">Paid Customers</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('prospects')">👥 Prospects</button>
+    <button class="tab" onclick="showTab('pipeline')">📊 Pipeline</button>
+    <button class="tab" onclick="showTab('tasks')">✅ Tasks</button>
+  </div>
+
+  <!-- PROSPECTS TAB -->
+  <div class="tab-content active" id="tab-prospects">
+    <div class="card">
+      <h2>
+        All Prospects
+        <div style="display:flex;gap:0.5rem;">
+          <input type="text" class="search-box" id="prospectSearch" placeholder="Search..." onkeyup="renderProspects()">
+          <button class="btn btn-primary" onclick="openAddModal()">+ Add</button>
+          <button class="btn btn-success" onclick="exportCSV()">Export CSV</button>
+        </div>
+      </h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Contact</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>City</th>
+              <th>Status</th>
+              <th>Last Contact</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="prospectsTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIPELINE TAB -->
+  <div class="tab-content" id="tab-pipeline">
+    <div class="card">
+      <h2>Sales Pipeline</h2>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-top:1rem;">
+        <div style="background:var(--bg);border-radius:8px;padding:1rem;">
+          <h3 style="font-size:0.9rem;color:var(--text-light);margin-bottom:0.5rem;">New</h3>
+          <div id="pipelineNew"></div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:1rem;">
+          <h3 style="font-size:0.9rem;color:var(--text-light);margin-bottom:0.5rem;">Contacted</h3>
+          <div id="pipelineContacted"></div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:1rem;">
+          <h3 style="font-size:0.9rem;color:var(--text-light);margin-bottom:0.5rem;">Interested</h3>
+          <div id="pipelineInterested"></div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:1rem;">
+          <h3 style="font-size:0.9rem;color:var(--text-light);margin-bottom:0.5rem;">Registered</h3>
+          <div id="pipelineRegistered"></div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:1rem;">
+          <h3 style="font-size:0.9rem;color:var(--text-light);margin-bottom:0.5rem;">Customer</h3>
+          <div id="pipelineCustomer"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASKS TAB -->
+  <div class="tab-content" id="tab-tasks">
+    <div class="card">
+      <h2>
+        Follow-Up Tasks
+        <button class="btn btn-primary" onclick="addTask()">+ Add Task</button>
+      </h2>
+      <div id="tasksList"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ADD PROSPECT MODAL -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeAddModal()">&times;</button>
+    <h2>Add Prospect</h2>
+    <div class="row">
+      <div class="form-group">
+        <label>Company Name</label>
+        <input type="text" id="addCompany" />
+      </div>
+      <div class="form-group">
+        <label>Contact Name</label>
+        <input type="text" id="addName" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="addEmail" />
+      </div>
+      <div class="form-group">
+        <label>Phone</label>
+        <input type="tel" id="addPhone" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>City</label>
+        <input type="text" id="addCity" />
+      </div>
+      <div class="form-group">
+        <label>Postcode</label>
+        <input type="text" id="addPostcode" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="addStatus">
+        <option value="new">New</option>
+        <option value="contacted">Contacted</option>
+        <option value="interested">Interested</option>
+        <option value="registered">Registered</option>
+        <option value="customer">Customer</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="addNotes" rows="3"></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="saveProspect()">Save Prospect</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// =====================
+// DATA
+// =====================
+const STORAGE_KEY = 'hvac_crm_prospects';
+const TASKS_KEY = 'hvac_crm_tasks';
+
+function getProspects() {
+  return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+}
+
+function saveProspects(prospects) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(prospects));
+}
+
+function getTasks() {
+  return JSON.parse(localStorage.getItem(TASKS_KEY) || '[]');
+}
+
+function saveTasks(tasks) {
+  localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+}
+
+// =====================
+// STATS
+// =====================
+function updateStats() {
+  const prospects = getProspects();
+  document.getElementById('statTotal').textContent = prospects.length;
+  document.getElementById('statContacted').textContent = prospects.filter(p => p.status !== 'new').length;
+  document.getElementById('statInterested').textContent = prospects.filter(p => ['interested', 'registered', 'customer'].includes(p.status)).length;
+  document.getElementById('statRegistered').textContent = prospects.filter(p => ['registered', 'customer'].includes(p.status)).length;
+  document.getElementById('statCustomer').textContent = prospects.filter(p => p.status === 'customer').length;
+}
+
+// =====================
+// TABS
+// =====================
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+
+  if (tab === 'prospects') renderProspects();
+  if (tab === 'pipeline') renderPipeline();
+  if (tab === 'tasks') renderTasks();
+}
+
+// =====================
+// PROSPECTS
+// =====================
+function renderProspects() {
+  const search = document.getElementById('prospectSearch').value.toLowerCase();
+  let prospects = getProspects();
+
+  if (search) {
+    prospects = prospects.filter(p =>
+      p.company.toLowerCase().includes(search) ||
+      p.name.toLowerCase().includes(search) ||
+      p.email.toLowerCase().includes(search) ||
+      p.city.toLowerCase().includes(search)
+    );
+  }
+
+  const tbody = document.getElementById('prospectsTable');
+  tbody.innerHTML = prospects.slice().reverse().map(p => `
+    <tr>
+      <td><strong>${p.company}</strong></td>
+      <td>${p.name}</td>
+      <td><a href="mailto:${p.email}">${p.email}</a></td>
+      <td>${p.phone || '—'}</td>
+      <td>${p.city}</td>
+      <td><span class="badge badge-${p.status}">${p.status}</span></td>
+      <td>${p.lastContact ? formatDate(p.lastContact) : 'Never'}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="editStatus('${p.id}')">Update</button>
+        <button class="btn btn-sm" onclick="addFollowUpTask('${p.id}')">Task</button>
+      </td>
+    </tr>
+  `).join('');
+
+  updateStats();
+}
+
+function openAddModal() {
+  document.getElementById('addModal').classList.add('active');
+}
+
+function closeAddModal() {
+  document.getElementById('addModal').classList.remove('active');
+  document.getElementById('addCompany').value = '';
+  document.getElementById('addName').value = '';
+  document.getElementById('addEmail').value = '';
+  document.getElementById('addPhone').value = '';
+  document.getElementById('addCity').value = '';
+  document.getElementById('addPostcode').value = '';
+  document.getElementById('addNotes').value = '';
+}
+
+function saveProspect() {
+  const prospect = {
+    id: 'prospect_' + Date.now(),
+    company: document.getElementById('addCompany').value.trim(),
+    name: document.getElementById('addName').value.trim(),
+    email: document.getElementById('addEmail').value.trim(),
+    phone: document.getElementById('addPhone').value.trim(),
+    city: document.getElementById('addCity').value.trim(),
+    postcode: document.getElementById('addPostcode').value.trim(),
+    status: document.getElementById('addStatus').value,
+    notes: document.getElementById('addNotes').value.trim(),
+    createdAt: new Date().toISOString(),
+    lastContact: null
+  };
+
+  if (!prospect.company || !prospect.email) {
+    showToast('Company name and email are required', 'error');
+    return;
+  }
+
+  const prospects = getProspects();
+  prospects.push(prospect);
+  saveProspects(prospects);
+
+  closeAddModal();
+  renderProspects();
+  showToast('Prospect added');
+}
+
+function editStatus(id) {
+  const prospects = getProspects();
+  const p = prospects.find(x => x.id === id);
+  if (!p) return;
+
+  const newStatus = prompt(`Update status for ${p.company}:\n\nnew, contacted, interested, registered, customer`, p.status);
+  if (!newStatus) return;
+
+  p.status = newStatus;
+  p.lastContact = new Date().toISOString();
+  saveProspects(prospects);
+  renderProspects();
+  showToast('Status updated');
+}
+
+function addFollowUpTask(prospectId) {
+  const prospects = getProspects();
+  const p = prospects.find(x => x.id === prospectId);
+  if (!p) return;
+
+  const taskText = prompt(`Follow-up task for ${p.company}:`);
+  if (!taskText) return;
+
+  const tasks = getTasks();
+  tasks.push({
+    id: 'task_' + Date.now(),
+    prospectId,
+    company: p.company,
+    text: taskText,
+    dueDate: new Date(Date.now() + 86400000 * 3).toISOString(), // 3 days
+    completed: false,
+    createdAt: new Date().toISOString()
+  });
+
+  saveTasks(tasks);
+  showToast('Task added');
+}
+
+// =====================
+// PIPELINE
+// =====================
+function renderPipeline() {
+  const prospects = getProspects();
+  const statuses = ['new', 'contacted', 'interested', 'registered', 'customer'];
+
+  statuses.forEach(status => {
+    const container = document.getElementById('pipeline' + status.charAt(0).toUpperCase() + status.slice(1));
+    const filtered = prospects.filter(p => p.status === status);
+
+    container.innerHTML = filtered.map(p => `
+      <div style="background:white;padding:0.75rem;border-radius:6px;margin-bottom:0.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <strong style="font-size:0.85rem;">${p.company}</strong>
+        <div style="font-size:0.75rem;color:var(--text-light);">${p.city} • ${p.name}</div>
+      </div>
+    `).join('') || '<div style="color:var(--text-light);font-size:0.85rem;text-align:center;padding:1rem;">None</div>';
+  });
+}
+
+// =====================
+// TASKS
+// =====================
+function renderTasks() {
+  const tasks = getTasks().filter(t => !t.completed);
+  const container = document.getElementById('tasksList');
+
+  if (tasks.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-light);">No pending tasks. Great job!</p>';
+    return;
+  }
+
+  container.innerHTML = tasks.map(t => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem;background:var(--bg);border-radius:8px;margin-bottom:0.5rem;">
+      <div>
+        <strong>${t.company}</strong> — ${t.text}
+        <div style="font-size:0.8rem;color:var(--text-light);">Due: ${formatDate(t.dueDate)}</div>
+      </div>
+      <button class="btn btn-sm btn-success" onclick="completeTask('${t.id}')">Done</button>
+    </div>
+  `).join('');
+}
+
+function addTask() {
+  const company = prompt('Company name:');
+  if (!company) return;
+  const text = prompt('Task:');
+  if (!text) return;
+
+  const tasks = getTasks();
+  tasks.push({
+    id: 'task_' + Date.now(),
+    prospectId: null,
+    company,
+    text,
+    dueDate: new Date(Date.now() + 86400000 * 3).toISOString(),
+    completed: false,
+    createdAt: new Date().toISOString()
+  });
+
+  saveTasks(tasks);
+  renderTasks();
+  showToast('Task added');
+}
+
+function completeTask(id) {
+  const tasks = getTasks();
+  const task = tasks.find(t => t.id === id);
+  if (task) {
+    task.completed = true;
+    saveTasks(tasks);
+    renderTasks();
+    showToast('Task completed');
+  }
+}
+
+// =====================
+// EXPORT
+// =====================
+function exportCSV() {
+  const prospects = getProspects();
+  const headers = ['Company', 'Contact', 'Email', 'Phone', 'City', 'Postcode', 'Status', 'Notes', 'Created'];
+  const rows = prospects.map(p => [
+    p.company, p.name, p.email, p.phone, p.city, p.postcode, p.status, p.notes, p.createdAt
+  ]);
+
+  const csv = [headers, ...rows].map(r => r.map(x => `"${(x || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'hvac-prospects-' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+
+  showToast('CSV exported');
+}
+
+// =====================
+// UTILITIES
+// =====================
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function showToast(message, type) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = 'toast ' + (type || 'success');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// =====================
+// INIT
+// =====================
+function init() {
+  // Add sample data if empty
+  if (getProspects().length === 0) {
+    const sample = [
+      { id: 'p1', company: 'Cool Air Ltd', name: 'Mark Thompson', email: 'mark@coolair.co.uk', phone: '07700 900123', city: 'Manchester', postcode: 'M1', status: 'contacted', notes: 'Interested, wants to see demo', createdAt: new Date(Date.now() - 86400000).toISOString(), lastContact: new Date(Date.now() - 86400000).toISOString() },
+      { id: 'p2', company: 'Arctic Cooling', name: 'Sarah Chen', email: 'sarah@arcticcooling.com', phone: '07701 900456', city: 'Birmingham', postcode: 'B1', status: 'interested', notes: 'Wants to start with Starter package', createdAt: new Date(Date.now() - 172800000).toISOString(), lastContact: new Date(Date.now() - 86400000).toISOString() },
+      { id: 'p3', company: 'Premier HVAC', name: 'John Davis', email: 'john@premierhvac.co.uk', phone: '07702 900789', city: 'London', postcode: 'SW1', status: 'new', notes: '', createdAt: new Date().toISOString(), lastContact: null }
+    ];
+    saveProspects(sample);
+  }
+
+  renderProspects();
+  updateStats();
+}
+
+init();
+</script>
+
+</body>
+</html>
