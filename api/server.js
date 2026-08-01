@@ -1,15 +1,34 @@
 const express = require('express');
 const cors = require('cors');
-const Stripe = require('stripe');
-const { Resend } = require('resend');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Initialize services
-const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+// Initialize services (will work when keys are added)
+let stripe = null;
+let resend = null;
+
+try {
+  if (process.env.STRIPE_SECRET_KEY) {
+    const Stripe = require('stripe');
+    stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+    console.log('✅ Stripe initialized');
+  }
+} catch (e) {
+  console.log('⚠️ Stripe not configured');
+}
+
+try {
+  if (process.env.RESEND_API_KEY) {
+    const { Resend } = require('resend');
+    resend = new Resend(process.env.RESEND_API_KEY);
+    console.log('✅ Resend initialized');
+  }
+} catch (e) {
+  console.log('⚠️ Resend not configured');
+}
 
 // In-memory storage (replace with database for production)
 const db = {
@@ -25,13 +44,21 @@ app.use(express.json());
 // HEALTH CHECK
 // =====================
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    stripe: !!stripe,
+    resend: !!resend,
+    companies: db.companies.length,
+    leads: db.leads.length,
+    purchases: db.purchases.length
+  });
 });
 
 // =====================
 // COMPANIES
 // =====================
-app.post('/api/companies/register', (req, res) => {
+app.post('/api/companies/register', async (req, res) => {
   const { company, name, email, phone, password, postcode, radius } = req.body;
 
   if (!company || !name || !email || !phone || !password || !postcode) {
@@ -62,12 +89,16 @@ app.post('/api/companies/register', (req, res) => {
 
   // Send welcome email
   if (resend) {
-    resend.emails.send({
-      from: 'HVAC Lead Pro <leads@hvacleadpro.com>',
-      to: email,
-      subject: 'Welcome to HVAC Lead Pro!',
-      html: `<h1>Welcome ${name}!</h1><p>Your company ${company} is now registered. Buy credits to start receiving qualified leads.</p><p><a href="https://hvac-calculator-opal.vercel.app/company-portal.html">Login to your dashboard</a></p>`
-    }).catch(console.error);
+    try {
+      await resend.emails.send({
+        from: 'HVAC Lead Pro <onboarding@resend.dev>',
+        to: email,
+        subject: 'Welcome to HVAC Lead Pro!',
+        html: `<h1>Welcome ${name}!</h1><p>Your company ${company} is now registered. Buy credits to start receiving qualified leads.</p><p><a href="https://hvac-calculator-opal.vercel.app/company-portal.html">Login to your dashboard</a></p>`
+      });
+    } catch (e) {
+      console.log('Failed to send welcome email:', e.message);
+    }
   }
 
   res.json({ success: true, company: { ...companyData, password: undefined } });
@@ -99,7 +130,7 @@ app.put('/api/companies/:id', (req, res) => {
 // =====================
 // LEADS
 // =====================
-app.post('/api/leads', (req, res) => {
+app.post('/api/leads', async (req, res) => {
   const { customerName, customerEmail, customerPhone, postcode, btu, roomType, propertyType, notes } = req.body;
 
   const lead = {
@@ -119,7 +150,7 @@ app.post('/api/leads', (req, res) => {
   db.leads.push(lead);
 
   // Auto-distribute to matching companies
-  const distributed = distributeLead(lead);
+  const distributed = await distributeLead(lead);
 
   res.json({ success: true, lead, distributed });
 });
@@ -146,7 +177,7 @@ app.put('/api/leads/:id', (req, res) => {
 // =====================
 app.post('/api/create-payment-intent', async (req, res) => {
   if (!stripe) {
-    return res.status(503).json({ error: 'Stripe not configured' });
+    return res.status(503).json({ error: 'Stripe not configured. Add STRIPE_SECRET_KEY to environment variables.' });
   }
 
   const { packageId, companyId } = req.body;
@@ -172,7 +203,7 @@ app.post('/api/create-payment-intent', async (req, res) => {
   }
 });
 
-app.post('/api/confirm-payment', (req, res) => {
+app.post('/api/confirm-payment', async (req, res) => {
   const { companyId, packageId, credits, amount } = req.body;
 
   const company = db.companies.find(c => c.id === companyId);
@@ -193,12 +224,16 @@ app.post('/api/confirm-payment', (req, res) => {
 
   // Send receipt email
   if (resend) {
-    resend.emails.send({
-      from: 'HVAC Lead Pro <leads@hvacleadpro.com>',
-      to: company.email,
-      subject: 'Payment Confirmation - HVAC Lead Pro',
-      html: `<h1>Thank you for your purchase!</h1><p>You bought ${credits} credits for £${amount / 100}.</p><p>Your new balance: ${company.credits} credits</p>`
-    }).catch(console.error);
+    try {
+      await resend.emails.send({
+        from: 'HVAC Lead Pro <receipts@resend.dev>',
+        to: company.email,
+        subject: 'Payment Confirmation - HVAC Lead Pro',
+        html: `<h1>Thank you for your purchase!</h1><p>You bought ${credits} credits for £${amount / 100}.</p><p>Your new balance: ${company.credits} credits</p><p><a href="https://hvac-calculator-opal.vercel.app/company-portal.html">View Dashboard</a></p>`
+      });
+    } catch (e) {
+      console.log('Failed to send receipt:', e.message);
+    }
   }
 
   res.json({ success: true, company: { ...company, password: undefined }, purchase });
@@ -231,7 +266,7 @@ app.get('/api/admin/stats', (req, res) => {
 // =====================
 // LEAD DISTRIBUTION
 // =====================
-function distributeLead(lead) {
+async function distributeLead(lead) {
   const leadPrefix = lead.postcode?.split(' ')[0];
   if (!leadPrefix) return [];
 
@@ -244,12 +279,12 @@ function distributeLead(lead) {
   eligible.sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const selected = eligible.slice(0, 3);
 
-  selected.forEach((company, idx) => {
+  for (const company of selected) {
     company.credits = (company.credits || 0) - 1;
 
     const companyLead = {
       ...lead,
-      id: lead.id + '_comp' + idx,
+      id: lead.id + '_comp' + company.id,
       originalLeadId: lead.id,
       companyId: company.id,
       status: 'new',
@@ -260,22 +295,26 @@ function distributeLead(lead) {
 
     // Send email notification
     if (resend && company.notifyEmail !== false) {
-      resend.emails.send({
-        from: 'HVAC Lead Pro <leads@hvacleadpro.com>',
-        to: company.email,
-        subject: '🔥 New Lead: ' + lead.customerName + ' - ' + lead.postcode,
-        html: `<h1>New Lead Alert!</h1>
-          <p><strong>Customer:</strong> ${lead.customerName}</p>
-          <p><strong>Email:</strong> ${lead.customerEmail}</p>
-          <p><strong>Phone:</strong> ${lead.customerPhone || 'Not provided'}</p>
-          <p><strong>Postcode:</strong> ${lead.postcode}</p>
-          <p><strong>BTU Required:</strong> ${lead.btu?.toLocaleString() || 'Not calculated'}</p>
-          <p><strong>Room Type:</strong> ${lead.roomType || 'Not specified'}</p>
-          <p><a href="https://hvac-calculator-opal.vercel.app/company-portal.html">View in Dashboard</a></p>
-          <p><em>Contact within 15 minutes for best results!</em></p>`
-      }).catch(console.error);
+      try {
+        await resend.emails.send({
+          from: 'HVAC Lead Pro <leads@resend.dev>',
+          to: company.email,
+          subject: '🔥 New Lead: ' + lead.customerName + ' - ' + lead.postcode,
+          html: `<h1>New Lead Alert!</h1>
+            <p><strong>Customer:</strong> ${lead.customerName}</p>
+            <p><strong>Email:</strong> ${lead.customerEmail}</p>
+            <p><strong>Phone:</strong> ${lead.customerPhone || 'Not provided'}</p>
+            <p><strong>Postcode:</strong> ${lead.postcode}</p>
+            <p><strong>BTU Required:</strong> ${lead.btu?.toLocaleString() || 'Not calculated'}</p>
+            <p><strong>Room Type:</strong> ${lead.roomType || 'Not specified'}</p>
+            <p><a href="https://hvac-calculator-opal.vercel.app/company-portal.html">View in Dashboard</a></p>
+            <p><em>Contact within 15 minutes for best results!</em></p>`
+        });
+      } catch (e) {
+        console.log('Failed to send lead notification:', e.message);
+      }
     }
-  });
+  }
 
   return selected.map(c => c.company);
 }
@@ -284,7 +323,8 @@ function distributeLead(lead) {
 // START SERVER
 // =====================
 app.listen(port, () => {
-  console.log(`HVAC Lead Pro API running on port ${port}`);
-  console.log(`Stripe: ${stripe ? 'Connected' : 'Not configured'}`);
-  console.log(`Resend: ${resend ? 'Connected' : 'Not configured'}`);
+  console.log(`🚀 HVAC Lead Pro API running on port ${port}`);
+  console.log(`📊 Health check: http://localhost:${port}/api/health`);
+  console.log(`💳 Stripe: ${stripe ? '✅ Connected' : '⚠️ Not configured (add STRIPE_SECRET_KEY)'}`);
+  console.log(`📧 Resend: ${resend ? '✅ Connected' : '⚠️ Not configured (add RESEND_API_KEY)'}`);
 });
