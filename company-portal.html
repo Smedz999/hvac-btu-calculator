@@ -954,24 +954,21 @@ async function processPayment() {
     // Demo mode: add credits immediately
     currentUser.credits = (currentUser.credits || 0) + selectedPackage.credits;
     
-    try {
-      await fetch(`${API_URL}/confirm-payment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId: currentUser.id,
-          packageId: selectedPackage.name.toLowerCase().replace(' ', '-'),
-          credits: selectedPackage.credits,
-          amount: selectedPackage.price
-        })
-      });
-    } catch (e) {
-      // Fallback: update locally
-    }
+    // Save purchase to localStorage
+    const purchases = getPurchases();
+    purchases.push({
+      id: 'pur_' + Date.now(),
+      companyId: currentUser.id,
+      package: selectedPackage.name,
+      credits: selectedPackage.credits,
+      amount: selectedPackage.priceDisplay,
+      createdAt: new Date().toISOString()
+    });
+    savePurchases(purchases);
 
     updateCurrentUser();
     closePaymentModal();
-    showToast(`Purchased ${selectedPackage.credits} credits!`);
+    showToast(`Purchased ${selectedPackage.credits} credits! (Demo mode - no payment processed)`);
     loadPurchaseHistory();
     return;
   }
