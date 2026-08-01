@@ -662,54 +662,53 @@ async function register() {
     return;
   }
 
-  try {
-    const res = await fetch(`${API_URL}/companies/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ company, name, email, phone, password, postcode, radius })
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      showToast(data.error || 'Registration failed', 'error');
-      return;
-    }
-
-    currentUser = data.company;
-    localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
-    showToast('Account created successfully!');
-    showApp();
-  } catch (err) {
-    showToast('Network error. Please try again.', 'error');
+  // Check if email already exists locally
+  const companies = getCompanies();
+  if (companies.find(c => c.email === email)) {
+    showToast('Email already registered. Please login.', 'error');
+    return;
   }
+
+  const companyData = {
+    id: 'comp_' + Date.now(),
+    company,
+    name,
+    email,
+    phone,
+    password,
+    postcode,
+    radius,
+    credits: 0,
+    createdAt: new Date().toISOString(),
+    notifyEmail: true,
+    notifySMS: false
+  };
+
+  companies.push(companyData);
+  saveCompanies(companies);
+
+  currentUser = companyData;
+  localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+  showToast('Account created successfully!');
+  showApp();
 }
 
 async function login() {
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
 
-  try {
-    const res = await fetch(`${API_URL}/companies/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
+  const companies = getCompanies();
+  const company = companies.find(c => c.email === email && c.password === password);
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      showToast(data.error || 'Login failed', 'error');
-      return;
-    }
-
-    currentUser = data.company;
-    localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
-    showToast('Welcome back, ' + currentUser.name + '!');
-    showApp();
-  } catch (err) {
-    showToast('Network error. Please try again.', 'error');
+  if (!company) {
+    showToast('Invalid email or password', 'error');
+    return;
   }
+
+  currentUser = company;
+  localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+  showToast('Welcome back, ' + company.name + '!');
+  showApp();
 }
 
 function logout() {
@@ -1081,13 +1080,13 @@ async function updateProfile() {
   currentUser.postcode = document.getElementById('profilePostcode').value.trim().toUpperCase();
   currentUser.radius = parseInt(document.getElementById('profileRadius').value) || 25;
 
-  try {
-    await fetch(`${API_URL}/companies/${currentUser.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(currentUser)
-    });
-  } catch (e) {}
+  // Update in companies list too
+  const companies = getCompanies();
+  const idx = companies.findIndex(c => c.id === currentUser.id);
+  if (idx >= 0) {
+    companies[idx] = currentUser;
+    saveCompanies(companies);
+  }
 
   updateCurrentUser();
   showToast('Profile updated successfully');
@@ -1102,10 +1101,43 @@ function updateNotifications() {
 }
 
 // =====================
-// DATA STORAGE (Fallback)
+// DATA STORAGE
 // =====================
+function getCompanies() {
+  return JSON.parse(localStorage.getItem('hvac_companies') || '[]');
+}
+
+function saveCompanies(companies) {
+  localStorage.setItem('hvac_companies', JSON.stringify(companies));
+}
+
+function getLeads() {
+  return JSON.parse(localStorage.getItem('hvac_leads') || '[]');
+}
+
+function saveLeads(leads) {
+  localStorage.setItem('hvac_leads', JSON.stringify(leads));
+}
+
+function getPurchases() {
+  return JSON.parse(localStorage.getItem('hvac_purchases') || '[]');
+}
+
+function savePurchases(purchases) {
+  localStorage.setItem('hvac_purchases', JSON.stringify(purchases));
+}
+
 function updateCurrentUser() {
   localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+
+  // Sync with companies list
+  const companies = getCompanies();
+  const idx = companies.findIndex(c => c.id === currentUser.id);
+  if (idx >= 0) {
+    companies[idx] = currentUser;
+    saveCompanies(companies);
+  }
+
   updateNavCredits();
 }
 
