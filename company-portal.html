@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HVAC Lead Pro — Contractor Portal</title>
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    :root {
+      --primary: #0f4c81;
+      --primary-dark: #0a3356;
+      --accent: #00a896;
+      --accent-dark: #008c7a;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --danger: #dc2626;
+      --text: #1f2937;
+      --text-light: #6b7280;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --shadow: 0 10px 40px rgba(15, 76, 129, 0.12);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* Navigation */
+    .nav {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-brand {
+      font-size: 1.25rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+
+    .nav-links a {
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover, .nav-links a.active {
+      color: white;
+    }
+
+    .nav-credits {
+      background: rgba(255,255,255,0.15);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+
+    /* Layout */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* Cards */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1.5rem;
+      color: var(--primary);
+      margin-bottom: 1rem;
+    }
+
+    .card h3 {
+      font-size: 1.1rem;
+      color: var(--text);
+      margin-bottom: 0.75rem;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .stat-label {
+      color: var(--text-light);
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+
+    .stat-card.success .stat-value { color: var(--success); }
+    .stat-card.warning .stat-value { color: var(--warning); }
+    .stat-card.danger .stat-value { color: var(--danger); }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.875rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+      color: white;
+      box-shadow: 0 4px 14px rgba(0, 168, 150, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0, 168, 150, 0.35);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: var(--primary);
+      border: 2px solid var(--primary);
+    }
+
+    .btn-secondary:hover { background: var(--primary-light); }
+
+    .btn-sm { padding: 0.5rem 1rem; font-size: 0.875rem; }
+
+    /* Forms */
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 0.4rem;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      background: white;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 600px) {
+      .row { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+    }
+
+    /* Pricing Cards */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .pricing-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 2px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+      position: relative;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .pricing-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+    }
+
+    .pricing-card.featured {
+      border-color: var(--accent);
+      transform: scale(1.02);
+    }
+
+    .pricing-card.featured::before {
+      content: "MOST POPULAR";
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: white;
+      padding: 0.25rem 1rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .pricing-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .pricing-price {
+      font-size: 3rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .pricing-price span {
+      font-size: 1rem;
+      color: var(--text-light);
+      font-weight: 400;
+    }
+
+    .pricing-features {
+      list-style: none;
+      margin: 1.5rem 0;
+      text-align: left;
+    }
+
+    .pricing-features li {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .pricing-features li::before {
+      content: "✓";
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    /* Leads Table */
+    .leads-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+
+    .leads-table th,
+    .leads-table td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .leads-table th {
+      font-weight: 700;
+      color: var(--primary);
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .leads-table tr:hover {
+      background: var(--bg);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .badge-new {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .badge-contacted {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge-won {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .badge-lost {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: white;
+      border-radius: var(--radius);
+      max-width: 600px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 2rem;
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--text-light);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--text);
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      transform: translateX(150%);
+      transition: transform 0.3s ease;
+      z-index: 2000;
+    }
+
+    .toast.show {
+      transform: translateX(0);
+    }
+
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--danger); }
+
+    /* Auth */
+    .auth-container {
+      max-width: 400px;
+      margin: 4rem auto;
+    }
+
+    .auth-logo {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .auth-logo h1 {
+      color: var(--primary);
+      font-size: 1.75rem;
+    }
+
+    .auth-toggle {
+      text-align: center;
+      margin-top: 1rem;
+      color: var(--text-light);
+    }
+
+    .auth-toggle a {
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    /* Lead Detail */
+    .lead-detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .lead-detail-item {
+      padding: 0.75rem;
+      background: var(--bg);
+      border-radius: 8px;
+    }
+
+    .lead-detail-item label {
+      font-size: 0.8rem;
+      color: var(--text-light);
+      margin-bottom: 0.25rem;
+    }
+
+    .lead-detail-item p {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .status-buttons {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="nav" id="mainNav" style="display:none;">
+  <div class="nav-brand">⚡ HVAC Lead Pro</div>
+  <div class="nav-links">
+    <a onclick="showPage('dashboard')" class="active" id="nav-dashboard">Dashboard</a>
+    <a onclick="showPage('leads')" id="nav-leads">My Leads</a>
+    <a onclick="showPage('buy')" id="nav-buy">Buy Credits</a>
+    <a onclick="showPage('profile')" id="nav-profile">Profile</a>
+    <a onclick="logout()">Logout</a>
+    <span class="nav-credits" id="navCreditCount">0 credits</span>
+  </div>
+</nav>
+
+<!-- AUTH PAGE -->
+<div class="page active" id="page-auth">
+  <div class="auth-container">
+    <div class="auth-logo">
+      <h1>⚡ HVAC Lead Pro</h1>
+      <p>Get qualified AC installation leads</p>
+    </div>
+
+    <!-- Login -->
+    <div class="card" id="loginForm">
+      <h2>Contractor Login</h2>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="your@company.com" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" />
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="login()">Login</button>
+      <div class="auth-toggle">
+        Don't have an account? <a onclick="toggleAuth('register')">Register</a>
+      </div>
+    </div>
+
+    <!-- Register -->
+    <div class="card hidden" id="registerForm">
+      <h2>Register Your Company</h2>
+      <div class="row">
+        <div class="form-group">
+          <label>Company Name *</label>
+          <input type="text" id="regCompany" placeholder="Cool Air Ltd" />
+        </div>
+        <div class="form-group">
+          <label>Contact Name *</label>
+          <input type="text" id="regName" placeholder="John Smith" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Email *</label>
+        <input type="email" id="regEmail" placeholder="john@coolair.com" />
+      </div>
+      <div class="form-group">
+        <label>Phone *</label>
+        <input type="tel" id="regPhone" placeholder="07700 900123" />
+      </div>
+      <div class="form-group">
+        <label>Password *</label>
+        <input type="password" id="regPassword" placeholder="Min 8 characters" />
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label>Postcode Area *</label>
+          <input type="text" id="regPostcode" placeholder="M1, M2, M3..." />
+        </div>
+        <div class="form-group">
+          <label>Service Radius (miles)</label>
+          <input type="number" id="regRadius" value="25" min="5" max="100" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Services Offered</label>
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem;">
+          <label style="display:flex;align-items:center;gap:0.35rem;font-weight:400;cursor:pointer;">
+            <input type="checkbox" value="install" checked /> Installation
+          </label>
+          <label style="display:flex;align-items:center;gap:0.35rem;font-weight:400;cursor:pointer;">
+            <input type="checkbox" value="repair" /> Repair
+          </label>
+          <label style="display:flex;align-items:center;gap:0.35rem;font-weight:400;cursor:pointer;">
+            <input type="checkbox" value="maintenance" /> Maintenance
+          </label>
+          <label style="display:flex;align-items:center;gap:0.35rem;font-weight:400;cursor:pointer;">
+            <input type="checkbox" value="commercial" /> Commercial
+          </label>
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="register()">Create Account</button>
+      <div class="auth-toggle">
+        Already have an account? <a onclick="toggleAuth('login')">Login</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD PAGE -->
+<div class="page" id="page-dashboard">
+  <div class="container">
+    <h1 style="margin-bottom:1.5rem;">Dashboard</h1>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="dashCredits">0</div>
+        <div class="stat-label">Credits Remaining</div>
+      </div>
+      <div class="stat-card success">
+        <div class="stat-value" id="dashLeads">0</div>
+        <div class="stat-label">Leads This Month</div>
+      </div>
+      <div class="stat-card warning">
+        <div class="stat-value" id="dashConversion">0%</div>
+        <div class="stat-label">Conversion Rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="dashRevenue">£0</div>
+        <div class="stat-label">Est. Revenue Won</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Recent Leads</h2>
+      <div id="recentLeadsList">
+        <p style="color:var(--text-light);">No leads yet. Buy credits to start receiving leads.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>How It Works</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.5rem;margin-top:1rem;">
+        <div style="text-align:center;">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">1️⃣</div>
+          <h3>Buy Credits</h3>
+          <p style="color:var(--text-light);font-size:0.9rem;">Purchase lead credits. 1 credit = 1 qualified lead.</p>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">2️⃣</div>
+          <h3>Receive Leads</h3>
+          <p style="color:var(--text-light);font-size:0.9rem;">Get notified instantly when a homeowner in your area requests quotes.</p>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">3️⃣</div>
+          <h3>Contact Customer</h3>
+          <p style="color:var(--text-light);font-size:0.9rem;">Call or email the customer within 15 minutes for best results.</p>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">4️⃣</div>
+          <h3>Win the Job</h3>
+          <p style="color:var(--text-light);font-size:0.9rem;">Close the deal and mark it won in your dashboard.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LEADS PAGE -->
+<div class="page" id="page-leads">
+  <div class="container">
+    <h1 style="margin-bottom:1.5rem;">My Leads</h1>
+
+    <div class="card">
+      <div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;">
+        <select id="leadFilter" onchange="filterLeads()" style="width:auto;min-width:150px;">
+          <option value="all">All Leads</option>
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="won">Won</option>
+          <option value="lost">Lost</option>
+        </select>
+        <input type="text" id="leadSearch" placeholder="Search by name or postcode..." onkeyup="filterLeads()" style="flex:1;min-width:200px;" />
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table class="leads-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Location</th>
+              <th>BTU Required</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="leadsTableBody">
+            <!-- Populated by JS -->
+          </tbody>
+        </table>
+      </div>
+      <div id="noLeadsMessage" style="text-align:center;padding:2rem;color:var(--text-light);">
+        <p>No leads match your filters.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BUY CREDITS PAGE -->
+<div class="page" id="page-buy">
+  <div class="container">
+    <h1 style="margin-bottom:1.5rem;">Buy Lead Credits</h1>
+
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <div class="pricing-name">Starter</div>
+        <div class="pricing-price">£25 <span>/ 5 leads</span></div>
+        <ul class="pricing-features">
+          <li>5 qualified leads</li>
+          <li>£5 per lead</li>
+          <li>Email notifications</li>
+          <li>Basic lead details</li>
+        </ul>
+        <button class="btn btn-primary" style="width:100%" onclick="buyCredits('starter')">Buy Now</button>
+      </div>
+
+      <div class="pricing-card featured">
+        <div class="pricing-name">Professional</div>
+        <div class="pricing-price">£60 <span>/ 15 leads</span></div>
+        <ul class="pricing-features">
+          <li>15 qualified leads</li>
+          <li>£4 per lead (save 20%)</li>
+          <li>Instant SMS + email alerts</li>
+          <li>Full customer details</li>
+          <li>Priority matching</li>
+        </ul>
+        <button class="btn btn-primary" style="width:100%" onclick="buyCredits('professional')">Buy Now</button>
+      </div>
+
+      <div class="pricing-card">
+        <div class="pricing-name">Business</div>
+        <div class="pricing-price">£100 <span>/ 30 leads</span></div>
+        <ul class="pricing-features">
+          <li>30 qualified leads</li>
+          <li>£3.33 per lead (save 33%)</li>
+          <li>Instant SMS + email alerts</li>
+          <li>Full customer details</li>
+          <li>Priority matching</li>
+          <li>Dedicated account manager</li>
+        </ul>
+        <button class="btn btn-primary" style="width:100%" onclick="buyCredits('business')">Buy Now</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Credit Purchase History</h2>
+      <div id="purchaseHistory">
+        <p style="color:var(--text-light);">No purchases yet.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROFILE PAGE -->
+<div class="page" id="page-profile">
+  <div class="container">
+    <h1 style="margin-bottom:1.5rem;">Company Profile</h1>
+
+    <div class="card">
+      <h2>Business Details</h2>
+      <div class="row">
+        <div class="form-group">
+          <label>Company Name</label>
+          <input type="text" id="profileCompany" />
+        </div>
+        <div class="form-group">
+          <label>Contact Name</label>
+          <input type="text" id="profileName" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="profileEmail" readonly style="background:var(--bg);" />
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="tel" id="profilePhone" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label>Postcode Area</label>
+          <input type="text" id="profilePostcode" />
+        </div>
+        <div class="form-group">
+          <label>Service Radius (miles)</label>
+          <input type="number" id="profileRadius" min="5" max="100" />
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="updateProfile()">Save Changes</button>
+    </div>
+
+    <div class="card">
+      <h2>Notification Settings</h2>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+          <input type="checkbox" id="notifyEmail" checked /> Email me when new leads arrive
+        </label>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+          <input type="checkbox" id="notifySMS" /> SMS me when new leads arrive
+        </label>
+      </div>
+      <button class="btn btn-primary" onclick="updateNotifications()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEAD DETAIL MODAL -->
+<div class="modal-overlay" id="leadModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeLeadModal()">&times;</button>
+    <h2>Lead Details</h2>
+    <div id="leadModalContent">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// =====================
+// STATE
+// =====================
+let currentUser = null;
+let leads = [];
+let purchases = [];
+
+// =====================
+// AUTH
+// =====================
+function toggleAuth(mode) {
+  document.getElementById('loginForm').classList.toggle('hidden', mode !== 'login');
+  document.getElementById('registerForm').classList.toggle('hidden', mode !== 'register');
+}
+
+function register() {
+  const company = document.getElementById('regCompany').value.trim();
+  const name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const phone = document.getElementById('regPhone').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const postcode = document.getElementById('regPostcode').value.trim().toUpperCase();
+  const radius = parseInt(document.getElementById('regRadius').value) || 25;
+
+  if (!company || !name || !email || !phone || !password || !postcode) {
+    showToast('Please fill in all required fields', 'error');
+    return;
+  }
+
+  if (password.length < 8) {
+    showToast('Password must be at least 8 characters', 'error');
+    return;
+  }
+
+  // Check if email already exists
+  const existing = getCompanies().find(c => c.email === email);
+  if (existing) {
+    showToast('Email already registered. Please login.', 'error');
+    return;
+  }
+
+  const companyData = {
+    id: 'comp_' + Date.now(),
+    company,
+    name,
+    email,
+    phone,
+    password, // In production, hash this!
+    postcode,
+    radius,
+    credits: 0,
+    createdAt: new Date().toISOString(),
+    notifyEmail: true,
+    notifySMS: false
+  };
+
+  const companies = getCompanies();
+  companies.push(companyData);
+  saveCompanies(companies);
+
+  // Auto-login
+  currentUser = companyData;
+  localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+
+  showToast('Account created successfully!');
+  showApp();
+}
+
+function login() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+
+  const companies = getCompanies();
+  const company = companies.find(c => c.email === email && c.password === password);
+
+  if (!company) {
+    showToast('Invalid email or password', 'error');
+    return;
+  }
+
+  currentUser = company;
+  localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+
+  showToast('Welcome back, ' + company.name + '!');
+  showApp();
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem('hvac_current_user');
+  showPage('auth');
+  document.getElementById('mainNav').style.display = 'none';
+}
+
+// =====================
+// NAVIGATION
+// =====================
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+
+  document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+  const navLink = document.getElementById('nav-' + page);
+  if (navLink) navLink.classList.add('active');
+
+  if (page === 'dashboard') loadDashboard();
+  if (page === 'leads') loadLeads();
+  if (page === 'buy') loadPurchaseHistory();
+  if (page === 'profile') loadProfile();
+}
+
+function showApp() {
+  document.getElementById('mainNav').style.display = 'flex';
+  updateNavCredits();
+  showPage('dashboard');
+}
+
+// =====================
+// DASHBOARD
+// =====================
+function loadDashboard() {
+  if (!currentUser) return;
+
+  const userLeads = getLeads().filter(l => l.companyId === currentUser.id);
+  const wonLeads = userLeads.filter(l => l.status === 'won');
+  const conversionRate = userLeads.length > 0 ? Math.round((wonLeads.length / userLeads.length) * 100) : 0;
+  const estRevenue = wonLeads.length * 2500; // Estimate £2500 avg job
+
+  document.getElementById('dashCredits').textContent = currentUser.credits || 0;
+  document.getElementById('dashLeads').textContent = userLeads.length;
+  document.getElementById('dashConversion').textContent = conversionRate + '%';
+  document.getElementById('dashRevenue').textContent = '£' + estRevenue.toLocaleString();
+
+  // Recent leads
+  const recent = userLeads.slice(-5).reverse();
+  const recentContainer = document.getElementById('recentLeadsList');
+
+  if (recent.length === 0) {
+    recentContainer.innerHTML = '<p style="color:var(--text-light);">No leads yet. <a href="#" onclick="showPage(\'buy\')">Buy credits</a> to start receiving leads.</p>';
+  } else {
+    recentContainer.innerHTML = recent.map(lead => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 0;border-bottom:1px solid var(--border);">
+        <div>
+          <strong>${lead.customerName}</strong> — ${lead.postcode}
+          <div style="font-size:0.85rem;color:var(--text-light);">${formatBtu(lead.btu)} BTU • ${formatDate(lead.createdAt)}</div>
+        </div>
+        <span class="badge badge-${lead.status}">${lead.status}</span>
+      </div>
+    `).join('');
+  }
+}
+
+// =====================
+// LEADS
+// =====================
+function loadLeads() {
+  if (!currentUser) return;
+
+  const userLeads = getLeads().filter(l => l.companyId === currentUser.id);
+  renderLeadsTable(userLeads);
+}
+
+function renderLeadsTable(leadsToRender) {
+  const tbody = document.getElementById('leadsTableBody');
+  const noMsg = document.getElementById('noLeadsMessage');
+
+  if (leadsToRender.length === 0) {
+    tbody.innerHTML = '';
+    noMsg.style.display = 'block';
+    return;
+  }
+
+  noMsg.style.display = 'none';
+  tbody.innerHTML = leadsToRender.map(lead => `
+    <tr>
+      <td>${formatDate(lead.createdAt)}</td>
+      <td>${lead.customerName}</td>
+      <td>${lead.postcode}</td>
+      <td>${formatBtu(lead.btu)} BTU</td>
+      <td><span class="badge badge-${lead.status}">${lead.status}</span></td>
+      <td>
+        <button class="btn btn-sm btn-secondary" onclick="viewLead('${lead.id}')">View</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterLeads() {
+  const status = document.getElementById('leadFilter').value;
+  const search = document.getElementById('leadSearch').value.toLowerCase();
+
+  let filtered = getLeads().filter(l => l.companyId === currentUser.id);
+
+  if (status !== 'all') {
+    filtered = filtered.filter(l => l.status === status);
+  }
+
+  if (search) {
+    filtered = filtered.filter(l =>
+      l.customerName.toLowerCase().includes(search) ||
+      l.postcode.toLowerCase().includes(search)
+    );
+  }
+
+  renderLeadsTable(filtered);
+}
+
+function viewLead(leadId) {
+  const lead = getLeads().find(l => l.id === leadId);
+  if (!lead) return;
+
+  const content = document.getElementById('leadModalContent');
+  content.innerHTML = `
+    <div class="lead-detail-grid">
+      <div class="lead-detail-item">
+        <label>Customer Name</label>
+        <p>${lead.customerName}</p>
+      </div>
+      <div class="lead-detail-item">
+        <label>Email</label>
+        <p><a href="mailto:${lead.customerEmail}">${lead.customerEmail}</a></p>
+      </div>
+      <div class="lead-detail-item">
+        <label>Phone</label>
+        <p>${lead.customerPhone || 'Not provided'}</p>
+      </div>
+      <div class="lead-detail-item">
+        <label>Postcode</label>
+        <p>${lead.postcode}</p>
+      </div>
+      <div class="lead-detail-item">
+        <label>BTU Required</label>
+        <p>${formatBtu(lead.btu)} BTU</p>
+      </div>
+      <div class="lead-detail-item">
+        <label>Room Type</label>
+        <p>${lead.roomType || 'Not specified'}</p>
+      </div>
+      <div class="lead-detail-item">
+        <label>Property Type</label>
+        <p>${lead.propertyType || 'Not specified'}</p>
+      </div>
+      <div class="lead-detail-item">
+        <label>Submitted</label>
+        <p>${formatDate(lead.createdAt)}</p>
+      </div>
+    </div>
+
+    ${lead.notes ? `
+    <div style="margin-top:1rem;padding:1rem;background:var(--bg);border-radius:8px;">
+      <label>Customer Notes</label>
+      <p>${lead.notes}</p>
+    </div>
+    ` : ''}
+
+    <div class="status-buttons">
+      <button class="btn btn-sm ${lead.status === 'contacted' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${lead.id}', 'contacted')">Mark Contacted</button>
+      <button class="btn btn-sm ${lead.status === 'won' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${lead.id}', 'won')">Mark Won</button>
+      <button class="btn btn-sm ${lead.status === 'lost' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${lead.id}', 'lost')">Mark Lost</button>
+    </div>
+  `;
+
+  document.getElementById('leadModal').classList.add('active');
+}
+
+function updateLeadStatus(leadId, status) {
+  const leads = getLeads();
+  const lead = leads.find(l => l.id === leadId);
+  if (lead) {
+    lead.status = status;
+    lead.statusUpdatedAt = new Date().toISOString();
+    saveLeads(leads);
+    showToast('Lead marked as ' + status);
+    closeLeadModal();
+    loadLeads();
+    loadDashboard();
+  }
+}
+
+function closeLeadModal() {
+  document.getElementById('leadModal').classList.remove('active');
+}
+
+// =====================
+// BUY CREDITS
+// =====================
+const CREDIT_PACKAGES = {
+  starter: { name: 'Starter', credits: 5, price: 2500, priceDisplay: '£25' },
+  professional: { name: 'Professional', credits: 15, price: 6000, priceDisplay: '£60' },
+  business: { name: 'Business', credits: 30, price: 10000, priceDisplay: '£100' }
+};
+
+function buyCredits(packageId) {
+  const pkg = CREDIT_PACKAGES[packageId];
+  if (!pkg) return;
+
+  // For demo: simulate purchase without Stripe
+  // In production, integrate Stripe here
+  if (typeof Stripe !== 'undefined' && false) { // Set to true for Stripe
+    // Stripe integration would go here
+  } else {
+    // Demo mode: add credits immediately
+    currentUser.credits = (currentUser.credits || 0) + pkg.credits;
+    updateCurrentUser();
+
+    const purchase = {
+      id: 'pur_' + Date.now(),
+      companyId: currentUser.id,
+      package: pkg.name,
+      credits: pkg.credits,
+      amount: pkg.priceDisplay,
+      createdAt: new Date().toISOString()
+    };
+
+    const purchases = getPurchases();
+    purchases.push(purchase);
+    savePurchases(purchases);
+
+    updateNavCredits();
+    showToast(`Purchased ${pkg.credits} credits!`);
+    loadPurchaseHistory();
+  }
+}
+
+function loadPurchaseHistory() {
+  const userPurchases = getPurchases().filter(p => p.companyId === currentUser.id);
+  const container = document.getElementById('purchaseHistory');
+
+  if (userPurchases.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-light);">No purchases yet.</p>';
+    return;
+  }
+
+  container.innerHTML = `
+    <table class="leads-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Package</th>
+          <th>Credits</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${userPurchases.slice().reverse().map(p => `
+          <tr>
+            <td>${formatDate(p.createdAt)}</td>
+            <td>${p.package}</td>
+            <td>${p.credits}</td>
+            <td>${p.amount}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// =====================
+// PROFILE
+// =====================
+function loadProfile() {
+  if (!currentUser) return;
+
+  document.getElementById('profileCompany').value = currentUser.company;
+  document.getElementById('profileName').value = currentUser.name;
+  document.getElementById('profileEmail').value = currentUser.email;
+  document.getElementById('profilePhone').value = currentUser.phone;
+  document.getElementById('profilePostcode').value = currentUser.postcode;
+  document.getElementById('profileRadius').value = currentUser.radius;
+  document.getElementById('notifyEmail').checked = currentUser.notifyEmail !== false;
+  document.getElementById('notifySMS').checked = currentUser.notifySMS === true;
+}
+
+function updateProfile() {
+  currentUser.company = document.getElementById('profileCompany').value.trim();
+  currentUser.name = document.getElementById('profileName').value.trim();
+  currentUser.phone = document.getElementById('profilePhone').value.trim();
+  currentUser.postcode = document.getElementById('profilePostcode').value.trim().toUpperCase();
+  currentUser.radius = parseInt(document.getElementById('profileRadius').value) || 25;
+
+  updateCurrentUser();
+  showToast('Profile updated successfully');
+}
+
+function updateNotifications() {
+  currentUser.notifyEmail = document.getElementById('notifyEmail').checked;
+  currentUser.notifySMS = document.getElementById('notifySMS').checked;
+
+  updateCurrentUser();
+  showToast('Notification settings saved');
+}
+
+// =====================
+// DATA STORAGE
+// =====================
+function getCompanies() {
+  return JSON.parse(localStorage.getItem('hvac_companies') || '[]');
+}
+
+function saveCompanies(companies) {
+  localStorage.setItem('hvac_companies', JSON.stringify(companies));
+}
+
+function getLeads() {
+  return JSON.parse(localStorage.getItem('hvac_leads') || '[]');
+}
+
+function saveLeads(leads) {
+  localStorage.setItem('hvac_leads', JSON.stringify(leads));
+}
+
+function getPurchases() {
+  return JSON.parse(localStorage.getItem('hvac_purchases') || '[]');
+}
+
+function savePurchases(purchases) {
+  localStorage.setItem('hvac_purchases', JSON.stringify(purchases));
+}
+
+function updateCurrentUser() {
+  localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+
+  const companies = getCompanies();
+  const idx = companies.findIndex(c => c.id === currentUser.id);
+  if (idx >= 0) {
+    companies[idx] = currentUser;
+    saveCompanies(companies);
+  }
+
+  updateNavCredits();
+}
+
+function updateNavCredits() {
+  const credits = currentUser ? (currentUser.credits || 0) : 0;
+  document.getElementById('navCreditCount').textContent = credits + ' credit' + (credits !== 1 ? 's' : '');
+}
+
+// =====================
+// UTILITIES
+// =====================
+function formatBtu(btu) {
+  return btu ? btu.toLocaleString() : '—';
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function showToast(message, type) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = 'toast ' + (type || 'success');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// =====================
+// INIT
+// =====================
+function init() {
+  const saved = localStorage.getItem('hvac_current_user');
+  if (saved) {
+    currentUser = JSON.parse(saved);
+    showApp();
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>

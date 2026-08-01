@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HVAC Lead Pro — Admin Dashboard</title>
+  <style>
+    :root {
+      --primary: #0f4c81;
+      --primary-dark: #0a3356;
+      --accent: #00a896;
+      --accent-dark: #008c7a;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --danger: #dc2626;
+      --text: #1f2937;
+      --text-light: #6b7280;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --shadow: 0 10px 40px rgba(15, 76, 129, 0.12);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .nav {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-brand { font-size: 1.25rem; font-weight: 800; }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .stat-value { font-size: 2.5rem; font-weight: 800; color: var(--primary); }
+    .stat-label { color: var(--text-light); font-size: 0.9rem; margin-top: 0.25rem; }
+    .stat-card.success .stat-value { color: var(--success); }
+    .stat-card.warning .stat-value { color: var(--warning); }
+    .stat-card.danger .stat-value { color: var(--danger); }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1.25rem;
+      color: var(--primary);
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0.5rem;
+    }
+
+    .tab {
+      padding: 0.5rem 1rem;
+      border: none;
+      background: none;
+      font-weight: 600;
+      color: var(--text-light);
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .tab:hover { color: var(--primary); }
+    .tab.active { color: var(--primary); background: var(--primary-light); }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      font-weight: 700;
+      color: var(--primary);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    tr:hover { background: var(--bg); }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-new { background: #dbeafe; color: #1e40af; }
+    .badge-contacted { background: #fef3c7; color: #92400e; }
+    .badge-won { background: #d1fae5; color: #065f46; }
+    .badge-lost { background: #fee2e2; color: #991b1b; }
+    .badge-paid { background: #d1fae5; color: #065f46; }
+    .badge-pending { background: #fef3c7; color: #92400e; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover { background: var(--accent-dark); }
+
+    .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .search-box {
+      padding: 0.5rem 1rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      width: 250px;
+    }
+
+    .search-box:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-light);
+    }
+
+    .revenue-box {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      padding: 2rem;
+      border-radius: var(--radius);
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .revenue-box h2 {
+      color: white;
+      font-size: 1rem;
+      opacity: 0.8;
+      margin-bottom: 0.5rem;
+    }
+
+    .revenue-box .amount {
+      font-size: 3rem;
+      font-weight: 800;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--text);
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      transform: translateX(150%);
+      transition: transform 0.3s ease;
+      z-index: 2000;
+    }
+
+    .toast.show { transform: translateX(0); }
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--danger); }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-brand">⚡ HVAC Lead Pro — Admin</div>
+  <div style="display:flex;gap:1rem;align-items:center;">
+    <a href="index.html" style="color:rgba(255,255,255,0.8);text-decoration:none;">← Back to Calculator</a>
+    <a href="company-portal.html" style="color:rgba(255,255,255,0.8);text-decoration:none;">Contractor Portal</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- Revenue Header -->
+  <div class="revenue-box">
+    <h2>Total Revenue</h2>
+    <div class="amount" id="totalRevenue">£0</div>
+    <p style="opacity:0.7;margin-top:0.5rem;">From all credit purchases</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value" id="statCompanies">0</div>
+      <div class="stat-label">Registered Companies</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-value" id="statLeads">0</div>
+      <div class="stat-label">Total Leads Generated</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-value" id="statDistributed">0</div>
+      <div class="stat-label">Leads Distributed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statCredits">0</div>
+      <div class="stat-label">Credits Sold</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-value" id="statConversion">0%</div>
+      <div class="stat-label">Avg Conversion</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="stat-value" id="statPending">0</div>
+      <div class="stat-label">Undistributed Leads</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('leads')">📋 All Leads</button>
+    <button class="tab" onclick="showTab('companies')">🏢 Companies</button>
+    <button class="tab" onclick="showTab('purchases')">💳 Purchases</button>
+    <button class="tab" onclick="showTab('analytics')">📊 Analytics</button>
+  </div>
+
+  <!-- Leads Tab -->
+  <div class="tab-content active" id="tab-leads">
+    <div class="card">
+      <h2>
+        All Leads
+        <input type="text" class="search-box" id="leadSearch" placeholder="Search leads..." onkeyup="renderLeads()">
+      </h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Postcode</th>
+              <th>BTU</th>
+              <th>Assigned To</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="leadsTable"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="leadsEmpty" style="display:none;">
+        <p>No leads found.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Companies Tab -->
+  <div class="tab-content" id="tab-companies">
+    <div class="card">
+      <h2>
+        Registered Companies
+        <input type="text" class="search-box" id="companySearch" placeholder="Search companies..." onkeyup="renderCompanies()">
+      </h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Contact</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Area</th>
+              <th>Credits</th>
+              <th>Leads</th>
+              <th>Joined</th>
+            </tr>
+          </thead>
+          <tbody id="companiesTable"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="companiesEmpty" style="display:none;">
+        <p>No companies registered yet.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Purchases Tab -->
+  <div class="tab-content" id="tab-purchases">
+    <div class="card">
+      <h2>Credit Purchase History</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Company</th>
+              <th>Package</th>
+              <th>Credits</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody id="purchasesTable"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="purchasesEmpty" style="display:none;">
+        <p>No purchases yet.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Analytics Tab -->
+  <div class="tab-content" id="tab-analytics">
+    <div class="grid-2">
+      <div class="card">
+        <h2>Leads by Status</h2>
+        <div id="statusChart" style="margin-top:1rem;"></div>
+      </div>
+      <div class="card">
+        <h2>Top Performing Companies</h2>
+        <div id="topCompanies" style="margin-top:1rem;"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Recent Activity</h2>
+      <div id="activityLog" style="margin-top:1rem;"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// =====================
+// DATA ACCESS
+// =====================
+function getCompanies() {
+  return JSON.parse(localStorage.getItem('hvac_companies') || '[]');
+}
+
+function getLeads() {
+  return JSON.parse(localStorage.getItem('hvac_leads') || '[]');
+}
+
+function getPurchases() {
+  return JSON.parse(localStorage.getItem('hvac_purchases') || '[]');
+}
+
+// =====================
+// STATS
+// =====================
+function loadStats() {
+  const companies = getCompanies();
+  const leads = getLeads();
+  const purchases = getPurchases();
+
+  const distributedLeads = leads.filter(l => l.companyId);
+  const originalLeads = leads.filter(l => !l.companyId);
+  const undistributed = originalLeads.filter(l => {
+    const assigned = leads.filter(dl => dl.originalLeadId === l.id);
+    return assigned.length === 0;
+  });
+
+  const totalCredits = purchases.reduce((sum, p) => sum + (p.credits || 0), 0);
+  const totalRevenue = purchases.reduce((sum, p) => {
+    const amount = parseInt(p.amount?.replace(/[^0-9]/g, '') || 0);
+    return sum + amount;
+  }, 0);
+
+  const wonLeads = leads.filter(l => l.status === 'won' && l.companyId);
+  const companyLeads = leads.filter(l => l.companyId);
+  const conversionRate = companyLeads.length > 0
+    ? Math.round((wonLeads.length / companyLeads.length) * 100)
+    : 0;
+
+  document.getElementById('statCompanies').textContent = companies.length;
+  document.getElementById('statLeads').textContent = originalLeads.length;
+  document.getElementById('statDistributed').textContent = distributedLeads.length;
+  document.getElementById('statCredits').textContent = totalCredits;
+  document.getElementById('statConversion').textContent = conversionRate + '%';
+  document.getElementById('statPending').textContent = undistributed.length;
+  document.getElementById('totalRevenue').textContent = '£' + totalRevenue;
+}
+
+// =====================
+// TABS
+// =====================
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+
+  event.target.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+
+  if (tab === 'leads') renderLeads();
+  if (tab === 'companies') renderCompanies();
+  if (tab === 'purchases') renderPurchases();
+  if (tab === 'analytics') renderAnalytics();
+}
+
+// =====================
+// RENDER LEADS
+// =====================
+function renderLeads() {
+  const search = document.getElementById('leadSearch').value.toLowerCase();
+  const leads = getLeads();
+  const companies = getCompanies();
+
+  let filtered = leads;
+  if (search) {
+    filtered = leads.filter(l =>
+      (l.customerName || '').toLowerCase().includes(search) ||
+      (l.postcode || '').toLowerCase().includes(search) ||
+      (l.customerEmail || '').toLowerCase().includes(search)
+    );
+  }
+
+  const tbody = document.getElementById('leadsTable');
+  const empty = document.getElementById('leadsEmpty');
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  tbody.innerHTML = filtered.slice().reverse().map(lead => {
+    const company = companies.find(c => c.id === lead.companyId);
+    return `
+      <tr>
+        <td>${formatDate(lead.createdAt)}</td>
+        <td>
+          <strong>${lead.customerName || 'Unknown'}</strong>
+          <div style="font-size:0.8rem;color:var(--text-light);">${lead.customerEmail || ''}</div>
+        </td>
+        <td>${lead.postcode || '—'}</td>
+        <td>${lead.btu ? lead.btu.toLocaleString() : '—'}</td>
+        <td>${company ? company.company : '<span style="color:var(--text-light);">Unassigned</span>'}</td>
+        <td><span class="badge badge-${lead.status || 'new'}">${lead.status || 'new'}</span></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// =====================
+// RENDER COMPANIES
+// =====================
+function renderCompanies() {
+  const search = document.getElementById('companySearch').value.toLowerCase();
+  const companies = getCompanies();
+  const leads = getLeads();
+
+  let filtered = companies;
+  if (search) {
+    filtered = companies.filter(c =>
+      (c.company || '').toLowerCase().includes(search) ||
+      (c.name || '').toLowerCase().includes(search) ||
+      (c.email || '').toLowerCase().includes(search)
+    );
+  }
+
+  const tbody = document.getElementById('companiesTable');
+  const empty = document.getElementById('companiesEmpty');
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  tbody.innerHTML = filtered.map(company => {
+    const companyLeads = leads.filter(l => l.companyId === company.id);
+    return `
+      <tr>
+        <td><strong>${company.company}</strong></td>
+        <td>${company.name}</td>
+        <td>${company.email}</td>
+        <td>${company.phone}</td>
+        <td>${company.postcode}</td>
+        <td><strong>${company.credits || 0}</strong></td>
+        <td>${companyLeads.length}</td>
+        <td>${formatDate(company.createdAt)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// =====================
+// RENDER PURCHASES
+// =====================
+function renderPurchases() {
+  const purchases = getPurchases();
+  const companies = getCompanies();
+  const tbody = document.getElementById('purchasesTable');
+  const empty = document.getElementById('purchasesEmpty');
+
+  if (purchases.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  tbody.innerHTML = purchases.slice().reverse().map(p => {
+    const company = companies.find(c => c.id === p.companyId);
+    return `
+      <tr>
+        <td>${formatDate(p.createdAt)}</td>
+        <td>${company ? company.company : 'Unknown'}</td>
+        <td>${p.package}</td>
+        <td>${p.credits}</td>
+        <td><strong>${p.amount}</strong></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// =====================
+// RENDER ANALYTICS
+// =====================
+function renderAnalytics() {
+  const leads = getLeads().filter(l => l.companyId);
+  const companies = getCompanies();
+
+  // Status breakdown
+  const statuses = {};
+  leads.forEach(l => {
+    const s = l.status || 'new';
+    statuses[s] = (statuses[s] || 0) + 1;
+  });
+
+  const statusLabels = { new: 'New', contacted: 'Contacted', won: 'Won', lost: 'Lost' };
+  const statusColors = { new: '#dbeafe', contacted: '#fef3c7', won: '#d1fae5', lost: '#fee2e2' };
+  const statusTextColors = { new: '#1e40af', contacted: '#92400e', won: '#065f46', lost: '#991b1b' };
+
+  let statusHtml = '<div style="display:flex;flex-direction:column;gap:0.75rem;">';
+  Object.entries(statuses).forEach(([status, count]) => {
+    const pct = Math.round((count / leads.length) * 100);
+    statusHtml += `
+      <div style="display:flex;align-items:center;gap:1rem;">
+        <span class="badge" style="background:${statusColors[status]};color:${statusTextColors[status]};min-width:80px;text-align:center;">${statusLabels[status]}</span>
+        <div style="flex:1;background:var(--bg);border-radius:8px;height:24px;overflow:hidden;">
+          <div style="width:${pct}%;background:${statusTextColors[status]};height:100%;border-radius:8px;transition:width 0.5s;"></div>
+        </div>
+        <span style="font-weight:700;min-width:60px;text-align:right;">${count}</span>
+      </div>
+    `;
+  });
+  statusHtml += '</div>';
+  document.getElementById('statusChart').innerHTML = statusHtml;
+
+  // Top companies
+  const companyStats = companies.map(c => {
+    const companyLeads = leads.filter(l => l.companyId === c.id);
+    const won = companyLeads.filter(l => l.status === 'won').length;
+    return { ...c, leadCount: companyLeads.length, wonCount: won };
+  }).sort((a, b) => b.leadCount - a.leadCount).slice(0, 5);
+
+  let topHtml = '<div style="display:flex;flex-direction:column;gap:0.75rem;">';
+  companyStats.forEach((c, i) => {
+    topHtml += `
+      <div style="display:flex;align-items:center;gap:1rem;padding:0.75rem;background:var(--bg);border-radius:8px;">
+        <span style="font-weight:800;color:var(--primary);min-width:24px;">${i + 1}</span>
+        <div style="flex:1;">
+          <strong>${c.company}</strong>
+          <div style="font-size:0.8rem;color:var(--text-light);">${c.leadCount} leads • ${c.wonCount} won</div>
+        </div>
+        <span style="font-weight:700;color:var(--success);">${Math.round((c.wonCount / Math.max(c.leadCount, 1)) * 100)}%</span>
+      </div>
+    `;
+  });
+  topHtml += '</div>';
+  document.getElementById('topCompanies').innerHTML = topHtml;
+
+  // Activity log
+  const allLeads = getLeads().slice().reverse().slice(0, 10);
+  let activityHtml = '<div style="display:flex;flex-direction:column;gap:0.5rem;">';
+  allLeads.forEach(l => {
+    const company = companies.find(c => c.id === l.companyId);
+    activityHtml += `
+      <div style="padding:0.75rem;background:var(--bg);border-radius:8px;font-size:0.9rem;">
+        <strong>${l.customerName || 'Lead'}</strong> from ${l.postcode || 'unknown'}
+        ${company ? `→ assigned to <strong>${company.company}</strong>` : '→ <span style="color:var(--warning);">unassigned</span>'}
+        <span style="color:var(--text-light);float:right;">${formatDate(l.createdAt)}</span>
+      </div>
+    `;
+  });
+  activityHtml += '</div>';
+  document.getElementById('activityLog').innerHTML = activityHtml;
+}
+
+// =====================
+// UTILITIES
+// =====================
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function showToast(message, type) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = 'toast ' + (type || 'success');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// =====================
+// INIT
+// =====================
+function init() {
+  loadStats();
+  renderLeads();
+}
+
+init();
+</script>
+
+</body>
+</html>

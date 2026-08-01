@@ -496,6 +496,7 @@
 
   <footer>
     <p>HVAC BTU Calculator — For estimation purposes only. A professional Manual J load calculation is recommended for final equipment selection.</p>
+    <p style="margin-top:0.5rem;"><a href="company-portal.html" style="color:var(--accent);text-decoration:none;font-weight:600;">🔧 Are you an HVAC contractor? Join our network →</a></p>
   </footer>
 
   <div class="toast" id="toast"></div>
@@ -709,15 +710,90 @@
         return;
       }
 
-      // In a real deployment, send this to your backend/CRM
-      console.log('Lead submitted:', { name, email, postcode, result: lastResult });
-      showToast('Thanks! Your quote request has been submitted.');
+      // Create lead object
+      const lead = {
+        id: 'lead_' + Date.now(),
+        customerName: name,
+        customerEmail: email,
+        postcode: postcode.toUpperCase(),
+        btu: lastResult ? lastResult.standardBtu : null,
+        roomType: document.getElementById('roomType').value,
+        createdAt: new Date().toISOString(),
+        status: 'new'
+      };
+
+      // Store lead locally (in production, send to backend)
+      const leads = JSON.parse(localStorage.getItem('hvac_leads') || '[]');
+      leads.push(lead);
+      localStorage.setItem('hvac_leads', JSON.stringify(leads));
+
+      // Auto-distribute to up to 3 companies with matching postcode and credits
+      distributeLead(lead);
+
+      showToast('Thanks! Your quote request has been submitted. Up to 3 local installers will contact you shortly.');
 
       trackEvent('lead_form_submit', {
         has_result: !!lastResult
       });
 
       document.getElementById('leadForm').reset();
+    }
+
+    function distributeLead(lead) {
+      // Get all registered companies
+      const companies = JSON.parse(localStorage.getItem('hvac_companies') || '[]');
+
+      // Filter companies that:
+      // 1. Have credits available
+      // 2. Serve the lead's postcode area (first 2-4 chars match)
+      const leadPrefix = lead.postcode.split(' ')[0];
+      const eligible = companies.filter(comp => {
+        if ((comp.credits || 0) <= 0) return false;
+        const compPrefix = comp.postcode.split(' ')[0];
+        return compPrefix === leadPrefix || comp.postcode.toUpperCase().startsWith(leadPrefix.substring(0, 2));
+      });
+
+      // Sort by credits (most active first) and pick top 3
+      eligible.sort((a, b) => (b.credits || 0) - (a.credits || 0));
+      const selected = eligible.slice(0, 3);
+
+      if (selected.length === 0) {
+        console.log('No eligible companies found for postcode:', lead.postcode);
+        return;
+      }
+
+      // Deduct credits and assign lead
+      const allLeads = JSON.parse(localStorage.getItem('hvac_leads') || '[]');
+      const leadIndex = allLeads.findIndex(l => l.id === lead.id);
+
+      selected.forEach((company, idx) => {
+        // Deduct 1 credit
+        company.credits = (company.credits || 0) - 1;
+
+        // Create company-specific lead copy
+        const companyLead = {
+          ...lead,
+          id: lead.id + '_comp' + idx,
+          originalLeadId: lead.id,
+          companyId: company.id,
+          status: 'new',
+          assignedAt: new Date().toISOString()
+        };
+
+        allLeads.push(companyLead);
+
+        // Update company in storage
+        const compIndex = companies.findIndex(c => c.id === company.id);
+        if (compIndex >= 0) companies[compIndex] = company;
+
+        // Simulate email notification
+        console.log('Lead assigned to:', company.company, company.email);
+      });
+
+      localStorage.setItem('hvac_leads', JSON.stringify(allLeads));
+      localStorage.setItem('hvac_companies', JSON.stringify(companies));
+
+      console.log('Lead distributed to', selected.length, 'companies');
     }
 
     function showToast(message) {
