@@ -32,7 +32,6 @@
       line-height: 1.6;
     }
 
-    /* Navigation */
     .nav {
       background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
       color: white;
@@ -45,19 +44,9 @@
       z-index: 100;
     }
 
-    .nav-brand {
-      font-size: 1.25rem;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
+    .nav-brand { font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; }
 
-    .nav-links {
-      display: flex;
-      gap: 2rem;
-      align-items: center;
-    }
+    .nav-links { display: flex; gap: 2rem; align-items: center; }
 
     .nav-links a {
       color: rgba(255,255,255,0.8);
@@ -67,9 +56,7 @@
       transition: color 0.2s;
     }
 
-    .nav-links a:hover, .nav-links a.active {
-      color: white;
-    }
+    .nav-links a:hover, .nav-links a.active { color: white; }
 
     .nav-credits {
       background: rgba(255,255,255,0.15);
@@ -78,17 +65,10 @@
       font-weight: 600;
     }
 
-    /* Layout */
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 2rem;
-    }
-
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
     .page { display: none; }
     .page.active { display: block; }
 
-    /* Cards */
     .card {
       background: var(--card);
       border-radius: var(--radius);
@@ -98,19 +78,9 @@
       margin-bottom: 1.5rem;
     }
 
-    .card h2 {
-      font-size: 1.5rem;
-      color: var(--primary);
-      margin-bottom: 1rem;
-    }
+    .card h2 { font-size: 1.5rem; color: var(--primary); margin-bottom: 1rem; }
+    .card h3 { font-size: 1.1rem; color: var(--text); margin-bottom: 0.75rem; }
 
-    .card h3 {
-      font-size: 1.1rem;
-      color: var(--text);
-      margin-bottom: 0.75rem;
-    }
-
-    /* Stats Grid */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -127,23 +97,12 @@
       text-align: center;
     }
 
-    .stat-value {
-      font-size: 2.5rem;
-      font-weight: 800;
-      color: var(--primary);
-    }
-
-    .stat-label {
-      color: var(--text-light);
-      font-size: 0.9rem;
-      margin-top: 0.25rem;
-    }
-
+    .stat-value { font-size: 2.5rem; font-weight: 800; color: var(--primary); }
+    .stat-label { color: var(--text-light); font-size: 0.9rem; margin-top: 0.25rem; }
     .stat-card.success .stat-value { color: var(--success); }
     .stat-card.warning .stat-value { color: var(--warning); }
     .stat-card.danger .stat-value { color: var(--danger); }
 
-    /* Buttons */
     .btn {
       display: inline-flex;
       align-items: center;
@@ -164,32 +123,14 @@
       box-shadow: 0 4px 14px rgba(0, 168, 150, 0.3);
     }
 
-    .btn-primary:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(0, 168, 150, 0.35);
-    }
-
-    .btn-secondary {
-      background: white;
-      color: var(--primary);
-      border: 2px solid var(--primary);
-    }
-
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0, 168, 150, 0.35); }
+    .btn-secondary { background: white; color: var(--primary); border: 2px solid var(--primary); }
     .btn-secondary:hover { background: var(--primary-light); }
-
     .btn-sm { padding: 0.5rem 1rem; font-size: 0.875rem; }
 
-    /* Forms */
-    .form-group {
-      margin-bottom: 1.25rem;
-    }
+    .form-group { margin-bottom: 1.25rem; }
 
-    label {
-      display: block;
-      font-weight: 600;
-      font-size: 0.9rem;
-      margin-bottom: 0.4rem;
-    }
+    label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.4rem; }
 
     input, select, textarea {
       width: 100%;
@@ -207,18 +148,13 @@
       box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
     }
 
-    .row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 
     @media (max-width: 600px) {
       .row { grid-template-columns: 1fr; }
       .nav-links { display: none; }
     }
 
-    /* Pricing Cards */
     .pricing-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -237,10 +173,7 @@
       transition: transform 0.2s, border-color 0.2s;
     }
 
-    .pricing-card:hover {
-      transform: translateY(-4px);
-      border-color: var(--accent);
-    }
+    .pricing-card:hover { transform: translateY(-4px); border-color: var(--accent); }
 
     .pricing-card.featured {
       border-color: var(--accent);
@@ -261,24 +194,9 @@
       font-weight: 700;
     }
 
-    .pricing-name {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--primary);
-      margin-bottom: 0.5rem;
-    }
-
-    .pricing-price {
-      font-size: 3rem;
-      font-weight: 800;
-      color: var(--text);
-    }
-
-    .pricing-price span {
-      font-size: 1rem;
-      color: var(--text-light);
-      font-weight: 400;
-    }
+    .pricing-name { font-size: 1.25rem; font-weight: 700; color: var(--primary); margin-bottom: 0.5rem; }
+    .pricing-price { font-size: 3rem; font-weight: 800; color: var(--text); }
+    .pricing-price span { font-size: 1rem; color: var(--text-light); font-weight: 400; }
 
     .pricing-features {
       list-style: none;
@@ -294,67 +212,19 @@
       gap: 0.5rem;
     }
 
-    .pricing-features li::before {
-      content: "✓";
-      color: var(--success);
-      font-weight: 700;
-    }
+    .pricing-features li::before { content: "✓"; color: var(--success); font-weight: 700; }
 
-    /* Leads Table */
-    .leads-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 1rem;
-    }
+    .leads-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    .leads-table th, .leads-table td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    .leads-table th { font-weight: 700; color: var(--primary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .leads-table tr:hover { background: var(--bg); }
 
-    .leads-table th,
-    .leads-table td {
-      padding: 1rem;
-      text-align: left;
-      border-bottom: 1px solid var(--border);
-    }
+    .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+    .badge-new { background: #dbeafe; color: #1e40af; }
+    .badge-contacted { background: #fef3c7; color: #92400e; }
+    .badge-won { background: #d1fae5; color: #065f46; }
+    .badge-lost { background: #fee2e2; color: #991b1b; }
 
-    .leads-table th {
-      font-weight: 700;
-      color: var(--primary);
-      font-size: 0.875rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .leads-table tr:hover {
-      background: var(--bg);
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 0.25rem 0.75rem;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 600;
-    }
-
-    .badge-new {
-      background: #dbeafe;
-      color: #1e40af;
-    }
-
-    .badge-contacted {
-      background: #fef3c7;
-      color: #92400e;
-    }
-
-    .badge-won {
-      background: #d1fae5;
-      color: #065f46;
-    }
-
-    .badge-lost {
-      background: #fee2e2;
-      color: #991b1b;
-    }
-
-    /* Modal */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -366,9 +236,7 @@
       padding: 1rem;
     }
 
-    .modal-overlay.active {
-      display: flex;
-    }
+    .modal-overlay.active { display: flex; }
 
     .modal {
       background: white;
@@ -392,7 +260,6 @@
       color: var(--text-light);
     }
 
-    /* Toast */
     .toast {
       position: fixed;
       bottom: 1.5rem;
@@ -402,84 +269,36 @@
       padding: 1rem 1.5rem;
       border-radius: 8px;
       font-weight: 600;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
       transform: translateX(150%);
       transition: transform 0.3s ease;
       z-index: 2000;
     }
 
-    .toast.show {
-      transform: translateX(0);
-    }
-
+    .toast.show { transform: translateX(0); }
     .toast.success { background: var(--success); }
     .toast.error { background: var(--danger); }
 
-    /* Auth */
-    .auth-container {
-      max-width: 400px;
-      margin: 4rem auto;
-    }
+    .auth-container { max-width: 400px; margin: 4rem auto; }
+    .auth-logo { text-align: center; margin-bottom: 2rem; }
+    .auth-logo h1 { color: var(--primary); font-size: 1.75rem; }
+    .auth-toggle { text-align: center; margin-top: 1rem; color: var(--text-light); }
+    .auth-toggle a { color: var(--accent); cursor: pointer; font-weight: 600; }
 
-    .auth-logo {
-      text-align: center;
-      margin-bottom: 2rem;
-    }
-
-    .auth-logo h1 {
-      color: var(--primary);
-      font-size: 1.75rem;
-    }
-
-    .auth-toggle {
-      text-align: center;
-      margin-top: 1rem;
-      color: var(--text-light);
-    }
-
-    .auth-toggle a {
-      color: var(--accent);
-      cursor: pointer;
-      font-weight: 600;
-    }
-
-    /* Lead Detail */
-    .lead-detail-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-      margin: 1rem 0;
-    }
-
-    .lead-detail-item {
-      padding: 0.75rem;
-      background: var(--bg);
-      border-radius: 8px;
-    }
-
-    .lead-detail-item label {
-      font-size: 0.8rem;
-      color: var(--text-light);
-      margin-bottom: 0.25rem;
-    }
-
-    .lead-detail-item p {
-      font-weight: 600;
-      font-size: 1rem;
-    }
-
-    .status-buttons {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 1.5rem;
-    }
-
+    .lead-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .lead-detail-item { padding: 0.75rem; background: var(--bg); border-radius: 8px; }
+    .lead-detail-item label { font-size: 0.8rem; color: var(--text-light); margin-bottom: 0.25rem; }
+    .lead-detail-item p { font-weight: 600; font-size: 1rem; }
+    .status-buttons { display: flex; gap: 0.5rem; margin-top: 1.5rem; }
     .hidden { display: none !important; }
+
+    /* Payment modal */
+    #paymentModal .modal { max-width: 500px; }
+    #card-element { padding: 1rem; border: 2px solid var(--border); border-radius: 8px; margin: 1rem 0; }
+    #card-errors { color: var(--danger); font-size: 0.9rem; margin-top: 0.5rem; }
   </style>
 </head>
 <body>
 
-<!-- Navigation -->
 <nav class="nav" id="mainNav" style="display:none;">
   <div class="nav-brand">⚡ HVAC Lead Pro</div>
   <div class="nav-links">
@@ -500,7 +319,6 @@
       <p>Get qualified AC installation leads</p>
     </div>
 
-    <!-- Login -->
     <div class="card" id="loginForm">
       <h2>Contractor Login</h2>
       <div class="form-group">
@@ -517,7 +335,6 @@
       </div>
     </div>
 
-    <!-- Register -->
     <div class="card hidden" id="registerForm">
       <h2>Register Your Company</h2>
       <div class="row">
@@ -550,23 +367,6 @@
         <div class="form-group">
           <label>Service Radius (miles)</label>
           <input type="number" id="regRadius" value="25" min="5" max="100" />
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Services Offered</label>
-        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem;">
-          <label style="display:flex;align-items:center;gap:0.35rem;font-weight:400;cursor:pointer;">
-            <input type="checkbox" value="install" checked /> Installation
-          </label>
-          <label style="display:flex;align-items:center;gap:0.35rem;font-weight:400;cursor:pointer;">
-            <input type="checkbox" value="repair" /> Repair
-          </label>
-          <label style="display:flex;align-items:center;gap:0.35rem;font-weight:400;cursor:pointer;">
-            <input type="checkbox" value="maintenance" /> Maintenance
-          </label>
-          <label style="display:flex;align-items:center;gap:0.35rem;font-weight:400;cursor:pointer;">
-            <input type="checkbox" value="commercial" /> Commercial
-          </label>
         </div>
       </div>
       <button class="btn btn-primary" style="width:100%" onclick="register()">Create Account</button>
@@ -665,9 +465,7 @@
               <th>Actions</th>
             </tr>
           </thead>
-          <tbody id="leadsTableBody">
-            <!-- Populated by JS -->
-          </tbody>
+          <tbody id="leadsTableBody"></tbody>
         </table>
       </div>
       <div id="noLeadsMessage" style="text-align:center;padding:2rem;color:var(--text-light);">
@@ -692,7 +490,7 @@
           <li>Email notifications</li>
           <li>Basic lead details</li>
         </ul>
-        <button class="btn btn-primary" style="width:100%" onclick="buyCredits('starter')">Buy Now</button>
+        <button class="btn btn-primary" style="width:100%" onclick="showPayment('starter')">Buy Now</button>
       </div>
 
       <div class="pricing-card featured">
@@ -705,7 +503,7 @@
           <li>Full customer details</li>
           <li>Priority matching</li>
         </ul>
-        <button class="btn btn-primary" style="width:100%" onclick="buyCredits('professional')">Buy Now</button>
+        <button class="btn btn-primary" style="width:100%" onclick="showPayment('professional')">Buy Now</button>
       </div>
 
       <div class="pricing-card">
@@ -719,7 +517,7 @@
           <li>Priority matching</li>
           <li>Dedicated account manager</li>
         </ul>
-        <button class="btn btn-primary" style="width:100%" onclick="buyCredits('business')">Buy Now</button>
+        <button class="btn btn-primary" style="width:100%" onclick="showPayment('business')">Buy Now</button>
       </div>
     </div>
 
@@ -794,9 +592,19 @@
   <div class="modal">
     <button class="modal-close" onclick="closeLeadModal()">&times;</button>
     <h2>Lead Details</h2>
-    <div id="leadModalContent">
-      <!-- Populated by JS -->
-    </div>
+    <div id="leadModalContent"></div>
+  </div>
+</div>
+
+<!-- PAYMENT MODAL -->
+<div class="modal-overlay" id="paymentModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closePaymentModal()">&times;</button>
+    <h2>Complete Payment</h2>
+    <p id="paymentSummary" style="margin:1rem 0;color:var(--text-light);"></p>
+    <div id="card-element"></div>
+    <div id="card-errors"></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:1rem;" id="payButton" onclick="processPayment()">Pay Now</button>
   </div>
 </div>
 
@@ -805,11 +613,27 @@
 
 <script>
 // =====================
+// CONFIG
+// =====================
+const API_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3001/api' 
+  : 'https://your-api-url.vercel.app/api'; // TODO: Update with your API URL
+
+const STRIPE_KEY = 'pk_test_YOUR_STRIPE_KEY'; // TODO: Replace with your Stripe publishable key
+
+// =====================
 // STATE
 // =====================
 let currentUser = null;
-let leads = [];
-let purchases = [];
+let stripe = null;
+let cardElement = null;
+let selectedPackage = null;
+
+const CREDIT_PACKAGES = {
+  starter: { name: 'Starter', credits: 5, price: 2500, priceDisplay: '£25' },
+  professional: { name: 'Professional', credits: 15, price: 6000, priceDisplay: '£60' },
+  business: { name: 'Business', credits: 30, price: 10000, priceDisplay: '£100' }
+};
 
 // =====================
 // AUTH
@@ -819,7 +643,7 @@ function toggleAuth(mode) {
   document.getElementById('registerForm').classList.toggle('hidden', mode !== 'register');
 }
 
-function register() {
+async function register() {
   const company = document.getElementById('regCompany').value.trim();
   const name = document.getElementById('regName').value.trim();
   const email = document.getElementById('regEmail').value.trim();
@@ -838,57 +662,54 @@ function register() {
     return;
   }
 
-  // Check if email already exists
-  const existing = getCompanies().find(c => c.email === email);
-  if (existing) {
-    showToast('Email already registered. Please login.', 'error');
-    return;
+  try {
+    const res = await fetch(`${API_URL}/companies/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company, name, email, phone, password, postcode, radius })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showToast(data.error || 'Registration failed', 'error');
+      return;
+    }
+
+    currentUser = data.company;
+    localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+    showToast('Account created successfully!');
+    showApp();
+  } catch (err) {
+    showToast('Network error. Please try again.', 'error');
   }
-
-  const companyData = {
-    id: 'comp_' + Date.now(),
-    company,
-    name,
-    email,
-    phone,
-    password, // In production, hash this!
-    postcode,
-    radius,
-    credits: 0,
-    createdAt: new Date().toISOString(),
-    notifyEmail: true,
-    notifySMS: false
-  };
-
-  const companies = getCompanies();
-  companies.push(companyData);
-  saveCompanies(companies);
-
-  // Auto-login
-  currentUser = companyData;
-  localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
-
-  showToast('Account created successfully!');
-  showApp();
 }
 
-function login() {
+async function login() {
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
 
-  const companies = getCompanies();
-  const company = companies.find(c => c.email === email && c.password === password);
+  try {
+    const res = await fetch(`${API_URL}/companies/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
 
-  if (!company) {
-    showToast('Invalid email or password', 'error');
-    return;
+    const data = await res.json();
+
+    if (!res.ok) {
+      showToast(data.error || 'Login failed', 'error');
+      return;
+    }
+
+    currentUser = data.company;
+    localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+    showToast('Welcome back, ' + currentUser.name + '!');
+    showApp();
+  } catch (err) {
+    showToast('Network error. Please try again.', 'error');
   }
-
-  currentUser = company;
-  localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
-
-  showToast('Welcome back, ' + company.name + '!');
-  showApp();
 }
 
 function logout() {
@@ -924,46 +745,56 @@ function showApp() {
 // =====================
 // DASHBOARD
 // =====================
-function loadDashboard() {
+async function loadDashboard() {
   if (!currentUser) return;
 
-  const userLeads = getLeads().filter(l => l.companyId === currentUser.id);
-  const wonLeads = userLeads.filter(l => l.status === 'won');
-  const conversionRate = userLeads.length > 0 ? Math.round((wonLeads.length / userLeads.length) * 100) : 0;
-  const estRevenue = wonLeads.length * 2500; // Estimate £2500 avg job
+  try {
+    const res = await fetch(`${API_URL}/leads?companyId=${currentUser.id}`);
+    const userLeads = await res.json();
 
-  document.getElementById('dashCredits').textContent = currentUser.credits || 0;
-  document.getElementById('dashLeads').textContent = userLeads.length;
-  document.getElementById('dashConversion').textContent = conversionRate + '%';
-  document.getElementById('dashRevenue').textContent = '£' + estRevenue.toLocaleString();
+    const wonLeads = userLeads.filter(l => l.status === 'won');
+    const conversionRate = userLeads.length > 0 ? Math.round((wonLeads.length / userLeads.length) * 100) : 0;
+    const estRevenue = wonLeads.length * 2500;
 
-  // Recent leads
-  const recent = userLeads.slice(-5).reverse();
-  const recentContainer = document.getElementById('recentLeadsList');
+    document.getElementById('dashCredits').textContent = currentUser.credits || 0;
+    document.getElementById('dashLeads').textContent = userLeads.length;
+    document.getElementById('dashConversion').textContent = conversionRate + '%';
+    document.getElementById('dashRevenue').textContent = '£' + estRevenue.toLocaleString();
 
-  if (recent.length === 0) {
-    recentContainer.innerHTML = '<p style="color:var(--text-light);">No leads yet. <a href="#" onclick="showPage(\'buy\')">Buy credits</a> to start receiving leads.</p>';
-  } else {
-    recentContainer.innerHTML = recent.map(lead => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 0;border-bottom:1px solid var(--border);">
-        <div>
-          <strong>${lead.customerName}</strong> — ${lead.postcode}
-          <div style="font-size:0.85rem;color:var(--text-light);">${formatBtu(lead.btu)} BTU • ${formatDate(lead.createdAt)}</div>
+    const recent = userLeads.slice(-5).reverse();
+    const recentContainer = document.getElementById('recentLeadsList');
+
+    if (recent.length === 0) {
+      recentContainer.innerHTML = '<p style="color:var(--text-light);">No leads yet. <a href="#" onclick="showPage(\'buy\')">Buy credits</a> to start receiving leads.</p>';
+    } else {
+      recentContainer.innerHTML = recent.map(lead => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 0;border-bottom:1px solid var(--border);">
+          <div>
+            <strong>${lead.customerName}</strong> — ${lead.postcode}
+            <div style="font-size:0.85rem;color:var(--text-light);">${formatBtu(lead.btu)} BTU • ${formatDate(lead.createdAt)}</div>
+          </div>
+          <span class="badge badge-${lead.status}">${lead.status}</span>
         </div>
-        <span class="badge badge-${lead.status}">${lead.status}</span>
-      </div>
-    `).join('');
+      `).join('');
+    }
+  } catch (err) {
+    console.error('Failed to load dashboard:', err);
   }
 }
 
 // =====================
 // LEADS
 // =====================
-function loadLeads() {
+async function loadLeads() {
   if (!currentUser) return;
 
-  const userLeads = getLeads().filter(l => l.companyId === currentUser.id);
-  renderLeadsTable(userLeads);
+  try {
+    const res = await fetch(`${API_URL}/leads?companyId=${currentUser.id}`);
+    const leads = await res.json();
+    renderLeadsTable(leads);
+  } catch (err) {
+    showToast('Failed to load leads', 'error');
+  }
 }
 
 function renderLeadsTable(leadsToRender) {
@@ -991,95 +822,98 @@ function renderLeadsTable(leadsToRender) {
   `).join('');
 }
 
-function filterLeads() {
+async function filterLeads() {
   const status = document.getElementById('leadFilter').value;
   const search = document.getElementById('leadSearch').value.toLowerCase();
 
-  let filtered = getLeads().filter(l => l.companyId === currentUser.id);
+  try {
+    const res = await fetch(`${API_URL}/leads?companyId=${currentUser.id}`);
+    let filtered = await res.json();
 
-  if (status !== 'all') {
-    filtered = filtered.filter(l => l.status === status);
+    if (status !== 'all') {
+      filtered = filtered.filter(l => l.status === status);
+    }
+
+    if (search) {
+      filtered = filtered.filter(l =>
+        l.customerName?.toLowerCase().includes(search) ||
+        l.postcode?.toLowerCase().includes(search)
+      );
+    }
+
+    renderLeadsTable(filtered);
+  } catch (err) {
+    console.error('Filter error:', err);
   }
-
-  if (search) {
-    filtered = filtered.filter(l =>
-      l.customerName.toLowerCase().includes(search) ||
-      l.postcode.toLowerCase().includes(search)
-    );
-  }
-
-  renderLeadsTable(filtered);
 }
 
 function viewLead(leadId) {
-  const lead = getLeads().find(l => l.id === leadId);
-  if (!lead) return;
+  fetch(`${API_URL}/leads`)
+    .then(r => r.json())
+    .then(leads => {
+      const lead = leads.find(l => l.id === leadId);
+      if (!lead) return;
 
-  const content = document.getElementById('leadModalContent');
-  content.innerHTML = `
-    <div class="lead-detail-grid">
-      <div class="lead-detail-item">
-        <label>Customer Name</label>
-        <p>${lead.customerName}</p>
-      </div>
-      <div class="lead-detail-item">
-        <label>Email</label>
-        <p><a href="mailto:${lead.customerEmail}">${lead.customerEmail}</a></p>
-      </div>
-      <div class="lead-detail-item">
-        <label>Phone</label>
-        <p>${lead.customerPhone || 'Not provided'}</p>
-      </div>
-      <div class="lead-detail-item">
-        <label>Postcode</label>
-        <p>${lead.postcode}</p>
-      </div>
-      <div class="lead-detail-item">
-        <label>BTU Required</label>
-        <p>${formatBtu(lead.btu)} BTU</p>
-      </div>
-      <div class="lead-detail-item">
-        <label>Room Type</label>
-        <p>${lead.roomType || 'Not specified'}</p>
-      </div>
-      <div class="lead-detail-item">
-        <label>Property Type</label>
-        <p>${lead.propertyType || 'Not specified'}</p>
-      </div>
-      <div class="lead-detail-item">
-        <label>Submitted</label>
-        <p>${formatDate(lead.createdAt)}</p>
-      </div>
-    </div>
+      const content = document.getElementById('leadModalContent');
+      content.innerHTML = `
+        <div class="lead-detail-grid">
+          <div class="lead-detail-item">
+            <label>Customer Name</label>
+            <p>${lead.customerName}</p>
+          </div>
+          <div class="lead-detail-item">
+            <label>Email</label>
+            <p><a href="mailto:${lead.customerEmail}">${lead.customerEmail}</a></p>
+          </div>
+          <div class="lead-detail-item">
+            <label>Phone</label>
+            <p>${lead.customerPhone || 'Not provided'}</p>
+          </div>
+          <div class="lead-detail-item">
+            <label>Postcode</label>
+            <p>${lead.postcode}</p>
+          </div>
+          <div class="lead-detail-item">
+            <label>BTU Required</label>
+            <p>${formatBtu(lead.btu)} BTU</p>
+          </div>
+          <div class="lead-detail-item">
+            <label>Room Type</label>
+            <p>${lead.roomType || 'Not specified'}</p>
+          </div>
+          <div class="lead-detail-item">
+            <label>Submitted</label>
+            <p>${formatDate(lead.createdAt)}</p>
+          </div>
+        </div>
 
-    ${lead.notes ? `
-    <div style="margin-top:1rem;padding:1rem;background:var(--bg);border-radius:8px;">
-      <label>Customer Notes</label>
-      <p>${lead.notes}</p>
-    </div>
-    ` : ''}
+        <div class="status-buttons">
+          <button class="btn btn-sm ${lead.status === 'contacted' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${lead.id}', 'contacted')">Mark Contacted</button>
+          <button class="btn btn-sm ${lead.status === 'won' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${lead.id}', 'won')">Mark Won</button>
+          <button class="btn btn-sm ${lead.status === 'lost' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${lead.id}', 'lost')">Mark Lost</button>
+        </div>
+      `;
 
-    <div class="status-buttons">
-      <button class="btn btn-sm ${lead.status === 'contacted' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${lead.id}', 'contacted')">Mark Contacted</button>
-      <button class="btn btn-sm ${lead.status === 'won' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${lead.id}', 'won')">Mark Won</button>
-      <button class="btn btn-sm ${lead.status === 'lost' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${lead.id}', 'lost')">Mark Lost</button>
-    </div>
-  `;
-
-  document.getElementById('leadModal').classList.add('active');
+      document.getElementById('leadModal').classList.add('active');
+    });
 }
 
-function updateLeadStatus(leadId, status) {
-  const leads = getLeads();
-  const lead = leads.find(l => l.id === leadId);
-  if (lead) {
-    lead.status = status;
-    lead.statusUpdatedAt = new Date().toISOString();
-    saveLeads(leads);
-    showToast('Lead marked as ' + status);
-    closeLeadModal();
-    loadLeads();
-    loadDashboard();
+async function updateLeadStatus(leadId, status) {
+  try {
+    const res = await fetch(`${API_URL}/leads/${leadId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+
+    if (res.ok) {
+      showToast('Lead marked as ' + status);
+      closeLeadModal();
+      loadLeads();
+      loadDashboard();
+    }
+  } catch (err) {
+    showToast('Failed to update status', 'error');
   }
 }
 
@@ -1088,51 +922,119 @@ function closeLeadModal() {
 }
 
 // =====================
-// BUY CREDITS
+// STRIPE PAYMENTS
 // =====================
-const CREDIT_PACKAGES = {
-  starter: { name: 'Starter', credits: 5, price: 2500, priceDisplay: '£25' },
-  professional: { name: 'Professional', credits: 15, price: 6000, priceDisplay: '£60' },
-  business: { name: 'Business', credits: 30, price: 10000, priceDisplay: '£100' }
-};
+function showPayment(packageId) {
+  selectedPackage = CREDIT_PACKAGES[packageId];
+  if (!selectedPackage) return;
 
-function buyCredits(packageId) {
-  const pkg = CREDIT_PACKAGES[packageId];
-  if (!pkg) return;
+  document.getElementById('paymentSummary').textContent = 
+    `${selectedPackage.name} Package — ${selectedPackage.credits} credits for ${selectedPackage.priceDisplay}`;
 
-  // For demo: simulate purchase without Stripe
-  // In production, integrate Stripe here
-  if (typeof Stripe !== 'undefined' && false) { // Set to true for Stripe
-    // Stripe integration would go here
-  } else {
-    // Demo mode: add credits immediately
-    currentUser.credits = (currentUser.credits || 0) + pkg.credits;
-    updateCurrentUser();
+  document.getElementById('paymentModal').classList.add('active');
 
-    const purchase = {
-      id: 'pur_' + Date.now(),
-      companyId: currentUser.id,
-      package: pkg.name,
-      credits: pkg.credits,
-      amount: pkg.priceDisplay,
-      createdAt: new Date().toISOString()
-    };
-
-    const purchases = getPurchases();
-    purchases.push(purchase);
-    savePurchases(purchases);
-
-    updateNavCredits();
-    showToast(`Purchased ${pkg.credits} credits!`);
-    loadPurchaseHistory();
+  // Initialize Stripe if not already done
+  if (!stripe && STRIPE_KEY !== 'pk_test_YOUR_STRIPE_KEY') {
+    stripe = Stripe(STRIPE_KEY);
+    const elements = stripe.elements();
+    cardElement = elements.create('card', { style: { base: { fontSize: '16px' } } });
+    cardElement.mount('#card-element');
   }
 }
 
-function loadPurchaseHistory() {
-  const userPurchases = getPurchases().filter(p => p.companyId === currentUser.id);
+function closePaymentModal() {
+  document.getElementById('paymentModal').classList.remove('active');
+  selectedPackage = null;
+}
+
+async function processPayment() {
+  if (!selectedPackage) return;
+
+  // If Stripe is not configured, fall back to demo mode
+  if (STRIPE_KEY === 'pk_test_YOUR_STRIPE_KEY') {
+    // Demo mode: add credits immediately
+    currentUser.credits = (currentUser.credits || 0) + selectedPackage.credits;
+    
+    try {
+      await fetch(`${API_URL}/confirm-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: currentUser.id,
+          packageId: selectedPackage.name.toLowerCase().replace(' ', '-'),
+          credits: selectedPackage.credits,
+          amount: selectedPackage.price
+        })
+      });
+    } catch (e) {
+      // Fallback: update locally
+    }
+
+    updateCurrentUser();
+    closePaymentModal();
+    showToast(`Purchased ${selectedPackage.credits} credits!`);
+    loadPurchaseHistory();
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/create-payment-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        packageId: selectedPackage.name.toLowerCase().replace(' ', '-'),
+        companyId: currentUser.id 
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.error) {
+      showToast(data.error, 'error');
+      return;
+    }
+
+    const result = await stripe.confirmCardPayment(data.clientSecret, {
+      payment_method: { card: cardElement }
+    });
+
+    if (result.error) {
+      document.getElementById('card-errors').textContent = result.error.message;
+    } else {
+      // Payment successful
+      await fetch(`${API_URL}/confirm-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: currentUser.id,
+          packageId: selectedPackage.name.toLowerCase().replace(' ', '-'),
+          credits: selectedPackage.credits,
+          amount: selectedPackage.price
+        })
+      });
+
+      currentUser.credits = (currentUser.credits || 0) + selectedPackage.credits;
+      updateCurrentUser();
+      closePaymentModal();
+      showToast(`Payment successful! ${selectedPackage.credits} credits added.`);
+      loadPurchaseHistory();
+    }
+  } catch (err) {
+    showToast('Payment failed. Please try again.', 'error');
+  }
+}
+
+// =====================
+// PURCHASE HISTORY
+// =====================
+async function loadPurchaseHistory() {
+  // For now, show from localStorage fallback
+  const purchases = JSON.parse(localStorage.getItem('hvac_purchases') || '[]')
+    .filter(p => p.companyId === currentUser.id);
+
   const container = document.getElementById('purchaseHistory');
 
-  if (userPurchases.length === 0) {
+  if (purchases.length === 0) {
     container.innerHTML = '<p style="color:var(--text-light);">No purchases yet.</p>';
     return;
   }
@@ -1140,15 +1042,10 @@ function loadPurchaseHistory() {
   container.innerHTML = `
     <table class="leads-table">
       <thead>
-        <tr>
-          <th>Date</th>
-          <th>Package</th>
-          <th>Credits</th>
-          <th>Amount</th>
-        </tr>
+        <tr><th>Date</th><th>Package</th><th>Credits</th><th>Amount</th></tr>
       </thead>
       <tbody>
-        ${userPurchases.slice().reverse().map(p => `
+        ${purchases.slice().reverse().map(p => `
           <tr>
             <td>${formatDate(p.createdAt)}</td>
             <td>${p.package}</td>
@@ -1170,19 +1067,27 @@ function loadProfile() {
   document.getElementById('profileCompany').value = currentUser.company;
   document.getElementById('profileName').value = currentUser.name;
   document.getElementById('profileEmail').value = currentUser.email;
-  document.getElementById('profilePhone').value = currentUser.phone;
+  document.getElementById('profilePhone').value = currentUser.phone || '';
   document.getElementById('profilePostcode').value = currentUser.postcode;
-  document.getElementById('profileRadius').value = currentUser.radius;
+  document.getElementById('profileRadius').value = currentUser.radius || 25;
   document.getElementById('notifyEmail').checked = currentUser.notifyEmail !== false;
   document.getElementById('notifySMS').checked = currentUser.notifySMS === true;
 }
 
-function updateProfile() {
+async function updateProfile() {
   currentUser.company = document.getElementById('profileCompany').value.trim();
   currentUser.name = document.getElementById('profileName').value.trim();
   currentUser.phone = document.getElementById('profilePhone').value.trim();
   currentUser.postcode = document.getElementById('profilePostcode').value.trim().toUpperCase();
   currentUser.radius = parseInt(document.getElementById('profileRadius').value) || 25;
+
+  try {
+    await fetch(`${API_URL}/companies/${currentUser.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentUser)
+    });
+  } catch (e) {}
 
   updateCurrentUser();
   showToast('Profile updated successfully');
@@ -1197,42 +1102,10 @@ function updateNotifications() {
 }
 
 // =====================
-// DATA STORAGE
+// DATA STORAGE (Fallback)
 // =====================
-function getCompanies() {
-  return JSON.parse(localStorage.getItem('hvac_companies') || '[]');
-}
-
-function saveCompanies(companies) {
-  localStorage.setItem('hvac_companies', JSON.stringify(companies));
-}
-
-function getLeads() {
-  return JSON.parse(localStorage.getItem('hvac_leads') || '[]');
-}
-
-function saveLeads(leads) {
-  localStorage.setItem('hvac_leads', JSON.stringify(leads));
-}
-
-function getPurchases() {
-  return JSON.parse(localStorage.getItem('hvac_purchases') || '[]');
-}
-
-function savePurchases(purchases) {
-  localStorage.setItem('hvac_purchases', JSON.stringify(purchases));
-}
-
 function updateCurrentUser() {
   localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
-
-  const companies = getCompanies();
-  const idx = companies.findIndex(c => c.id === currentUser.id);
-  if (idx >= 0) {
-    companies[idx] = currentUser;
-    saveCompanies(companies);
-  }
-
   updateNavCredits();
 }
 
