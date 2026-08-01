@@ -619,6 +619,9 @@ const API_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:3001/api' 
   : 'https://hvac-lead-pro-api.up.railway.app/api';
 
+// Fallback: if API fails, use localStorage
+let useLocalFallback = false;
+
 const STRIPE_KEY = 'pk_test_YOUR_STRIPE_KEY'; // TODO: Replace with your Stripe publishable key
 
 // =====================
@@ -662,53 +665,88 @@ async function register() {
     return;
   }
 
-  // Check if email already exists locally
-  const companies = getCompanies();
-  if (companies.find(c => c.email === email)) {
-    showToast('Email already registered. Please login.', 'error');
-    return;
+  try {
+    const res = await fetch(`${API_URL}/companies/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company, name, email, phone, password, postcode, radius })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showToast(data.error || 'Registration failed', 'error');
+      return;
+    }
+
+    currentUser = data.company;
+    localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+    showToast('Account created! Welcome email sent.');
+    showApp();
+  } catch (err) {
+    // Fallback to localStorage
+    const companies = getCompanies();
+    if (companies.find(c => c.email === email)) {
+      showToast('Email already registered. Please login.', 'error');
+      return;
+    }
+
+    const companyData = {
+      id: 'comp_' + Date.now(),
+      company, name, email, phone, password, postcode, radius,
+      credits: 0,
+      createdAt: new Date().toISOString(),
+      notifyEmail: true,
+      notifySMS: false
+    };
+
+    companies.push(companyData);
+    saveCompanies(companies);
+
+    currentUser = companyData;
+    localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+    showToast('Account created! (Email not sent - API offline)');
+    showApp();
   }
-
-  const companyData = {
-    id: 'comp_' + Date.now(),
-    company,
-    name,
-    email,
-    phone,
-    password,
-    postcode,
-    radius,
-    credits: 0,
-    createdAt: new Date().toISOString(),
-    notifyEmail: true,
-    notifySMS: false
-  };
-
-  companies.push(companyData);
-  saveCompanies(companies);
-
-  currentUser = companyData;
-  localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
-  showToast('Account created successfully!');
-  showApp();
 }
 
 async function login() {
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
 
-  const companies = getCompanies();
-  const company = companies.find(c => c.email === email && c.password === password);
+  try {
+    const res = await fetch(`${API_URL}/companies/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
 
-  if (!company) {
-    showToast('Invalid email or password', 'error');
-    return;
+    const data = await res.json();
+
+    if (!res.ok) {
+      showToast(data.error || 'Login failed', 'error');
+      return;
+    }
+
+    currentUser = data.company;
+    localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+    showToast('Welcome back, ' + currentUser.name + '!');
+    showApp();
+  } catch (err) {
+    // Fallback to localStorage
+    const companies = getCompanies();
+    const company = companies.find(c => c.email === email && c.password === password);
+
+    if (!company) {
+      showToast('Invalid email or password', 'error');
+      return;
+    }
+
+    currentUser = company;
+    localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+    showToast('Welcome back, ' + company.name + '! (Offline mode)');
+    showApp();
   }
-
-  currentUser = company;
-  localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
-  showToast('Welcome back, ' + company.name + '!');
-  showApp();
 }
 
 function logout() {
