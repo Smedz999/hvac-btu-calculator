@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coming Soon — HVAC BTU Calculator & Quote Service</title>
+  <meta name="description" content="Get notified when our free HVAC BTU calculator and quote matching service launches in your area.">
+  <style>
+    :root {
+      --primary: #0f4c81;
+      --primary-dark: #0a3356;
+      --accent: #00a896;
+      --accent-dark: #008c7a;
+      --text: #1f2937;
+      --text-light: #6b7280;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --shadow: 0 10px 40px rgba(15, 76, 129, 0.12);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      padding: 5rem 2rem 3rem;
+      text-align: center;
+    }
+
+    .hero h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; }
+    .hero p { font-size: 1.2rem; opacity: 0.9; max-width: 600px; margin: 0 auto; }
+
+    .container { max-width: 800px; margin: 0 auto; padding: 3rem 2rem; flex: 1; }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      padding: 2.5rem;
+      text-align: center;
+    }
+
+    .countdown {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .countdown-item {
+      background: var(--bg);
+      border-radius: 12px;
+      padding: 1.25rem;
+      min-width: 80px;
+    }
+
+    .countdown-item .number {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--primary);
+      line-height: 1;
+    }
+
+    .countdown-item .label {
+      font-size: 0.85rem;
+      color: var(--text-light);
+      margin-top: 0.25rem;
+    }
+
+    .form-group { margin-bottom: 1.25rem; text-align: left; }
+
+    label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.4rem; }
+
+    input, select {
+      width: 100%;
+      padding: 0.875rem 1rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+      color: white;
+      box-shadow: 0 4px 14px rgba(0, 168, 150, 0.3);
+    }
+
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin: 3rem 0;
+    }
+
+    .feature {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .feature-icon { font-size: 2rem; margin-bottom: 0.75rem; }
+    .feature h3 { color: var(--primary); font-size: 1.1rem; margin-bottom: 0.5rem; }
+    .feature p { color: var(--text-light); font-size: 0.9rem; }
+
+    .social-proof {
+      background: #e6f0f8;
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin: 2rem 0;
+      text-align: center;
+    }
+
+    .social-proof .number { font-size: 2rem; font-weight: 800; color: var(--primary); }
+
+    footer {
+      background: var(--text);
+      color: white;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--success);
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      transform: translateX(150%);
+      transition: transform 0.3s ease;
+      z-index: 2000;
+    }
+
+    .toast.show { transform: translateX(0); }
+
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 1.75rem; }
+      .countdown { gap: 0.75rem; }
+      .countdown-item { padding: 0.75rem; min-width: 60px; }
+      .countdown-item .number { font-size: 1.75rem; }
+    }
+  </style>
+</head>
+<body>
+
+<section class="hero">
+  <h1>🚀 Coming Soon</h1>
+  <p>The easiest way to calculate your AC size and get quotes from local installers.</p>
+</section>
+
+<div class="container">
+
+  <div class="card">
+    <h2 style="color:var(--primary);margin-bottom:0.5rem;">Launching In</h2>
+
+    <div class="countdown" id="countdown">
+      <div class="countdown-item">
+        <div class="number" id="days">14</div>
+        <div class="label">Days</div>
+      </div>
+      <div class="countdown-item">
+        <div class="number" id="hours">00</div>
+        <div class="label">Hours</div>
+      </div>
+      <div class="countdown-item">
+        <div class="number" id="minutes">00</div>
+        <div class="label">Minutes</div>
+      </div>
+      <div class="countdown-item">
+        <div class="number" id="seconds">00</div>
+        <div class="label">Seconds</div>
+      </div>
+    </div>
+
+    <p style="color:var(--text-light);margin-bottom:1.5rem;">Join the waitlist and be the first to know when we launch in your area.</p>
+
+    <form id="waitlistForm" onsubmit="event.preventDefault(); submitWaitlist();">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" id="wlName" placeholder="Your name" required />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="wlEmail" placeholder="your@email.com" required />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>City/Area</label>
+        <input type="text" id="wlCity" placeholder="e.g. Manchester" required />
+      </div>
+      <div class="form-group">
+        <label>What are you looking for?</label>
+        <select id="wlInterest">
+          <option>Home air conditioning</option>
+          <option>Office/commercial AC</option>
+          <option>Multiple rooms</option>
+          <option>Just exploring options</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">Notify Me When Live →</button>
+    </form>
+
+    <div class="social-proof">
+      <div class="number" id="waitlistCount">127</div>
+      <p style="color:var(--text-light);">people already on the waitlist</p>
+    </div>
+  </div>
+
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">🧮</div>
+      <h3>Free BTU Calculator</h3>
+      <p>Calculate the exact AC size for your room in 30 seconds.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📊</div>
+      <h3>3 Free Quotes</h3>
+      <p>Get matched with up to 3 certified local installers.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">✅</div>
+      <h3>Verified Installers</h3>
+      <p>All contractors are F-Gas certified and reviewed.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">💰</div>
+      <h3>Compare Prices</h3>
+      <p>See transparent pricing and choose the best deal.</p>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <p>HVAC Lead Pro — Coming Soon</p>
+  <p style="margin-top:0.5rem;opacity:0.7;font-size:0.9rem;">Are you an HVAC contractor? <a href="early-access.html">Join early access</a></p>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Countdown timer
+const launchDate = new Date();
+launchDate.setDate(launchDate.getDate() + 14);
+
+function updateCountdown() {
+  const now = new Date();
+  const diff = launchDate - now;
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+  document.getElementById('days').textContent = String(days).padStart(2, '0');
+  document.getElementById('hours').textContent = String(hours).padStart(2, '0');
+  document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
+  document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
+}
+
+setInterval(updateCountdown, 1000);
+updateCountdown();
+
+// Simulate waitlist growth
+setInterval(() => {
+  const countEl = document.getElementById('waitlistCount');
+  let count = parseInt(countEl.textContent);
+  if (Math.random() > 0.8) {
+    countEl.textContent = count + 1;
+  }
+}, 15000);
+
+function submitWaitlist() {
+  const data = {
+    name: document.getElementById('wlName').value.trim(),
+    email: document.getElementById('wlEmail').value.trim(),
+    city: document.getElementById('wlCity').value.trim(),
+    interest: document.getElementById('wlInterest').value,
+    submittedAt: new Date().toISOString()
+  };
+
+  const submissions = JSON.parse(localStorage.getItem('hvac_waitlist') || '[]');
+  submissions.push(data);
+  localStorage.setItem('hvac_waitlist', JSON.stringify(submissions));
+
+  // Increment counter
+  const countEl = document.getElementById('waitlistCount');
+  countEl.textContent = parseInt(countEl.textContent) + 1;
+
+  showToast('✅ You\'re on the list! We\'ll email you when we launch.');
+  document.getElementById('waitlistForm').reset();
+}
+
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 4000);
+}
+</script>
+
+</body>
+</html>

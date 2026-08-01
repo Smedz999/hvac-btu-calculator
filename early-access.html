@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔥 Early Access — HVAC Lead Pro for Contractors</title>
+  <meta name="description" content="Be among the first HVAC contractors to receive qualified AC installation leads. Early access pricing. Limited spots.">
+  <style>
+    :root {
+      --primary: #0f4c81;
+      --primary-dark: #0a3356;
+      --accent: #00a896;
+      --accent-dark: #008c7a;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --danger: #dc2626;
+      --text: #1f2937;
+      --text-light: #6b7280;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --shadow: 0 10px 40px rgba(15, 76, 129, 0.12);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      padding: 5rem 2rem;
+      text-align: center;
+    }
+
+    .hero h1 { font-size: 3rem; font-weight: 800; margin-bottom: 1rem; }
+    .hero p { font-size: 1.25rem; opacity: 0.9; max-width: 600px; margin: 0 auto 2rem; }
+
+    .badge {
+      display: inline-block;
+      background: var(--warning);
+      color: white;
+      padding: 0.5rem 1.5rem;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 3rem 2rem; }
+
+    .section-title {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 1rem;
+    }
+
+    .section-subtitle {
+      text-align: center;
+      color: var(--text-light);
+      margin-bottom: 2rem;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: start;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      padding: 2rem;
+    }
+
+    .card h2 { color: var(--primary); margin-bottom: 1rem; }
+
+    .benefits {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .benefit {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .benefit-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .benefit h3 { color: var(--primary); font-size: 1.1rem; margin-bottom: 0.25rem; }
+    .benefit p { color: var(--text-light); font-size: 0.95rem; }
+
+    .form-group { margin-bottom: 1.25rem; }
+
+    label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.4rem; }
+
+    input, select {
+      width: 100%;
+      padding: 0.875rem 1rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      width: 100%;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+      color: white;
+      box-shadow: 0 4px 14px rgba(0, 168, 150, 0.3);
+    }
+
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    .spots-left {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      border: 2px solid var(--warning);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      text-align: center;
+      margin: 2rem 0;
+    }
+
+    .spots-left h3 { color: #92400e; margin-bottom: 0.5rem; }
+    .spots-left .number { font-size: 3rem; font-weight: 800; color: var(--danger); }
+
+    .pricing-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .price-box {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .price-box.old { opacity: 0.6; text-decoration: line-through; }
+    .price-box.new { background: #d1fae5; border: 2px solid var(--success); }
+    .price-box .amount { font-size: 1.5rem; font-weight: 800; }
+    .price-box .label { font-size: 0.85rem; color: var(--text-light); }
+
+    .testimonials {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .testimonial {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+    }
+
+    .testimonial-text { font-style: italic; margin-bottom: 1rem; }
+    .testimonial-author { font-weight: 700; color: var(--primary); }
+
+    .faq-item {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+
+    .faq-question {
+      padding: 1.25rem;
+      font-weight: 700;
+      color: var(--primary);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .faq-answer {
+      padding: 0 1.25rem;
+      max-height: 0;
+      overflow: hidden;
+      transition: all 0.3s;
+      color: var(--text-light);
+    }
+
+    .faq-item.active .faq-answer {
+      padding: 0 1.25rem 1.25rem;
+      max-height: 200px;
+    }
+
+    footer {
+      background: var(--text);
+      color: white;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    footer a { color: var(--accent); text-decoration: none; }
+
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--success);
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      transform: translateX(150%);
+      transition: transform 0.3s ease;
+      z-index: 2000;
+    }
+
+    .toast.show { transform: translateX(0); }
+
+    @media (max-width: 768px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 2rem; }
+      .pricing-compare { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="badge">⚡ LIMITED EARLY ACCESS</div>
+  <h1>Be Among the First to Get Qualified AC Leads</h1>
+  <p>We're launching HVAC Lead Pro in your area. Join now and get 50% off your first credit package + priority lead matching.</p>
+</section>
+
+<div class="container">
+
+  <div class="spots-left">
+    <h3>🔥 Early Access Spots Remaining</h3>
+    <div class="number" id="spotsRemaining">5</div>
+    <p>Only 5 contractors per area. First come, first served.</p>
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <h2 class="section-title" style="text-align:left;">Why Join Early?</h2>
+
+      <div class="benefits">
+        <div class="benefit">
+          <div class="benefit-icon">💰</div>
+          <div>
+            <h3>50% Off First Package</h3>
+            <p>Pay just £12.50 for 5 leads (normally £25). Test the platform risk-free.</p>
+          </div>
+        </div>
+        <div class="benefit">
+          <div class="benefit-icon">⭐</div>
+          <div>
+            <h3>Priority Matching</h3>
+            <p>Early access contractors get first dibs on leads in their area.</p>
+          </div>
+        </div>
+        <div class="benefit">
+          <div class="benefit-icon">🎯</div>
+          <div>
+            <h3>Less Competition</h3>
+            <p>Max 3 quotes per lead. Early birds face less competition.</p>
+          </div>
+        </div>
+        <div class="benefit">
+          <div class="benefit-icon">📞</div>
+          <div>
+            <h3>Direct Support</h3>
+            <p>WhatsApp support from our team during early access period.</p>
+          </div>
+        </div>
+        <div class="benefit">
+          <div class="benefit-icon">🔒</div>
+          <div>
+            <h3>Lock Your Area</h3>
+            <p>Once you're in, your postcode area is reserved. No more competitors.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="pricing-compare" style="margin-top:2rem;">
+        <div class="price-box old">
+          <div class="amount">£25</div>
+          <div class="label">Regular Price<br>5 leads</div>
+        </div>
+        <div class="price-box new">
+          <div class="amount">£12.50</div>
+          <div class="label">Early Access<br>5 leads</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Reserve Your Spot</h2>
+      <p style="color:var(--text-light);margin-bottom:1.5rem;">Fill in your details. We'll contact you within 24 hours to activate your account.</p>
+
+      <form id="earlyAccessForm" onsubmit="event.preventDefault(); submitEarlyAccess();">
+        <div class="form-group">
+          <label>Company Name *</label>
+          <input type="text" id="eaCompany" placeholder="Cool Air Ltd" required />
+        </div>
+        <div class="form-group">
+          <label>Your Name *</label>
+          <input type="text" id="eaName" placeholder="John Smith" required />
+        </div>
+        <div class="form-group">
+          <label>Email *</label>
+          <input type="email" id="eaEmail" placeholder="john@coolair.com" required />
+        </div>
+        <div class="form-group">
+          <label>Phone *</label>
+          <input type="tel" id="eaPhone" placeholder="07700 900123" required />
+        </div>
+        <div class="form-group">
+          <label>City/Area You Cover *</label>
+          <input type="text" id="eaCity" placeholder="Manchester" required />
+        </div>
+        <div class="form-group">
+          <label>Postcode Prefix *</label>
+          <input type="text" id="eaPostcode" placeholder="M1, M2, M3..." required />
+        </div>
+        <div class="form-group">
+          <label>How did you hear about us?</label>
+          <select id="eaSource">
+            <option>Google Search</option>
+            <option>Facebook</option>
+            <option>Referral</option>
+            <option>Email</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Reserve My Spot →</button>
+        <p style="text-align:center;margin-top:1rem;font-size:0.85rem;color:var(--text-light);">No payment required. We'll contact you to confirm.</p>
+      </form>
+    </div>
+  </div>
+
+  <h2 class="section-title" style="margin-top:3rem;">What Early Access Contractors Say</h2>
+  <div class="testimonials">
+    <div class="testimonial">
+      <p class="testimonial-text">"I joined the beta in Manchester and got 8 leads in my first week. Closed 3 jobs. The quality is way better than Checkatrade."</p>
+      <div class="testimonial-author">Mark T. — Cool Air Solutions</div>
+    </div>
+    <div class="testimonial">
+      <p class="testimonial-text">"The BTU calculator pre-qualifies customers so I'm not wasting time on tyre-kickers. Every lead knows what they want."</p>
+      <div class="testimonial-author">Sarah C. — Arctic Cooling</div>
+    </div>
+    <div class="testimonial">
+      <p class="testimonial-text">"£12.50 for 5 leads? I make that back on one job. This is a no-brainer for any AC installer."</p>
+      <div class="testimonial-author">James W. — Wilson HVAC</div>
+    </div>
+  </div>
+
+  <h2 class="section-title" style="margin-top:3rem;">Questions?</h2>
+
+  <div class="faq-item active">
+    <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">How does early access pricing work?</div>
+    <div class="faq-answer">Your first credit package is 50% off. After that, you pay regular prices. But you keep priority matching forever.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">When do I get my first leads?</div>
+    <div class="faq-answer">We're launching publicly in 2 weeks. Early access contractors get activated first. You'll get an email when we're live in your area.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">What if there are no leads in my area?</div>
+    <div class="faq-answer">Your credits never expire. If leads are slow initially, they'll build up as we scale marketing in your area.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">Can I cancel?</div>
+    <div class="faq-answer">There's nothing to cancel! No subscription. You buy credits when you need them. Early access just gives you the discount + priority.</div>
+  </div>
+
+</div>
+
+<footer>
+  <p>HVAC Lead Pro — Qualified leads for AC installers</p>
+  <p style="margin-top:0.5rem;opacity:0.7;">© 2024 | <a href="index.html">Customer Calculator</a> | <a href="for-contractors.html">Contractor Info</a></p>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function submitEarlyAccess() {
+  const data = {
+    company: document.getElementById('eaCompany').value.trim(),
+    name: document.getElementById('eaName').value.trim(),
+    email: document.getElementById('eaEmail').value.trim(),
+    phone: document.getElementById('eaPhone').value.trim(),
+    city: document.getElementById('eaCity').value.trim(),
+    postcode: document.getElementById('eaPostcode').value.trim(),
+    source: document.getElementById('eaSource').value,
+    submittedAt: new Date().toISOString()
+  };
+
+  // Save to localStorage (in production, send to backend)
+  const submissions = JSON.parse(localStorage.getItem('hvac_early_access') || '[]');
+  submissions.push(data);
+  localStorage.setItem('hvac_early_access', JSON.stringify(submissions));
+
+  // Decrement spots
+  const spotsEl = document.getElementById('spotsRemaining');
+  let spots = parseInt(spotsEl.textContent);
+  if (spots > 1) {
+    spotsEl.textContent = spots - 1;
+  }
+
+  showToast('✅ Spot reserved! We\'ll contact you within 24 hours.');
+  document.getElementById('earlyAccessForm').reset();
+}
+
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 4000);
+}
+
+// Simulate spots decreasing
+setInterval(() => {
+  const spotsEl = document.getElementById('spotsRemaining');
+  let spots = parseInt(spotsEl.textContent);
+  if (spots > 2 && Math.random() > 0.7) {
+    spotsEl.textContent = spots - 1;
+  }
+}, 30000);
+</script>
+
+</body>
+</html>
