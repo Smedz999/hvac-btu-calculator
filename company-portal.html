@@ -1032,6 +1032,7 @@ function closePaymentModal() {
 
 async function processPayment() {
   if (!selectedPackage) return;
+  let paymentSucceeded = false;
 
   // If Stripe is not configured, fall back to demo mode
   if (!STRIPE_KEY || !STRIPE_KEY.startsWith('pk_')) {
@@ -1085,6 +1086,7 @@ async function processPayment() {
       showToast(result.error.message, 'error');
     } else {
       // Payment successful - add credits immediately
+      paymentSucceeded = true;
       currentUser.credits = (currentUser.credits || 0) + selectedPackage.credits;
       updateCurrentUser();
       
@@ -1120,7 +1122,9 @@ async function processPayment() {
     }
   } catch (err) {
     console.error('Payment error:', err);
-    showToast('Payment failed. Please try again.', 'error');
+    if (!paymentSucceeded) {
+      showToast('Payment failed. Please try again.', 'error');
+    }
   }
 }
 
