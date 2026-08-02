@@ -1056,11 +1056,13 @@ async function processPayment() {
   }
 
   try {
+    const packageId = Object.keys(CREDIT_PACKAGES).find(key => CREDIT_PACKAGES[key].name === selectedPackage.name);
+    
     const res = await fetch(`${API_URL}/create-payment-intent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        packageId: selectedPackage.name.toLowerCase().replace(' ', '-'),
+        packageId: packageId,
         companyId: currentUser.id 
       })
     });
@@ -1078,26 +1080,32 @@ async function processPayment() {
 
     if (result.error) {
       document.getElementById('card-errors').textContent = result.error.message;
+      showToast(result.error.message, 'error');
     } else {
       // Payment successful
-      await fetch(`${API_URL}/confirm-payment`, {
+      const confirmRes = await fetch(`${API_URL}/confirm-payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId: currentUser.id,
-          packageId: selectedPackage.name.toLowerCase().replace(' ', '-'),
+          packageId: packageId,
           credits: selectedPackage.credits,
           amount: selectedPackage.price
         })
       });
 
-      currentUser.credits = (currentUser.credits || 0) + selectedPackage.credits;
-      updateCurrentUser();
-      closePaymentModal();
-      showToast(`Payment successful! ${selectedPackage.credits} credits added.`);
-      loadPurchaseHistory();
+      if (confirmRes.ok) {
+        currentUser.credits = (currentUser.credits || 0) + selectedPackage.credits;
+        updateCurrentUser();
+        closePaymentModal();
+        showToast(`Payment successful! ${selectedPackage.credits} credits added.`);
+        loadPurchaseHistory();
+      } else {
+        showToast('Payment processed but failed to update credits. Contact support.', 'error');
+      }
     }
   } catch (err) {
+    console.error('Payment error:', err);
     showToast('Payment failed. Please try again.', 'error');
   }
 }
