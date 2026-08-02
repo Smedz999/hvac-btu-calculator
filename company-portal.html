@@ -1012,7 +1012,7 @@ function showPayment(packageId) {
   document.getElementById('paymentModal').classList.add('active');
 
   // Initialize Stripe if not already done
-  if (!stripe && STRIPE_KEY !== 'pk_test_51TzjYlJp1KyOxEczDXQokcXcjTzVmamZAT6tkUPdWs3WoPbM7HwZynD3vA2f3wJNQDOnQnfn3vD8iLNPQbWxCCwF00bXJAgcoN') {
+  if (!stripe && STRIPE_KEY && STRIPE_KEY.startsWith('pk_')) {
     stripe = Stripe(STRIPE_KEY);
     const elements = stripe.elements();
     cardElement = elements.create('card', { style: { base: { fontSize: '16px' } } });
@@ -1029,7 +1029,7 @@ async function processPayment() {
   if (!selectedPackage) return;
 
   // If Stripe is not configured, fall back to demo mode
-  if (!STRIPE_KEY || STRIPE_KEY === 'pk_test_YOUR_STRIPE_KEY') {
+  if (!STRIPE_KEY || !STRIPE_KEY.startsWith('pk_')) {
     // Demo mode: add credits immediately
     currentUser.credits = (currentUser.credits || 0) + selectedPackage.credits;
     
