@@ -618,14 +618,12 @@
 // =====================
 // CONFIG
 // =====================
-const API_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:3001/api' 
-  : 'https://hvac-lead-pro-api.up.railway.app/api';
+const API_URL = '/api';
 
 // Fallback: if API fails, use localStorage
 let useLocalFallback = false;
 
-const STRIPE_KEY = 'pk_test_51TzjYlJp1KyOxEczDXQokcXcjTzVmamZAT6tkUPdWs3WoPbM7HwZynD3vA2f3wJNQDOnQnfn3vD8iLNPQbWxCCwF00bXJAgcoN';
+const STRIPE_KEY = 'pk_test_51TzjYlJp1KyOxEczDXQokcXcjTzVmamZAT6tkUPdWs3WoPbM7HwZynD3vA2f3wJNQDOnQnfn3vD8iLNPQbWxCCwF00bXJAgcoN'; // Your Stripe publishable key
 
 // =====================
 // STATE
