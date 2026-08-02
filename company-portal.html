@@ -1122,6 +1122,8 @@ async function processPayment() {
     }
   } catch (err) {
     console.error('Payment error:', err);
+    console.error('Error stack:', err.stack);
+    console.error('Payment succeeded flag:', paymentSucceeded);
     if (!paymentSucceeded) {
       showToast('Payment failed. Please try again.', 'error');
     }
