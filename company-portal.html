@@ -3,42 +3,47 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HVAC Lead Pro — Contractor Portal</title>
+  <title>ACConnx — Contractor Portal</title>
   <script src="https://js.stripe.com/v3/"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <style>
     :root {
-      --primary: #0f4c81;
-      --primary-dark: #0a3356;
-      --accent: #00a896;
-      --accent-dark: #008c7a;
+      --primary: #0a2540;
+      --primary-light: #1a3a5c;
+      --accent: #00d4aa;
+      --accent-dark: #00b894;
       --warning: #f59e0b;
       --success: #10b981;
       --danger: #dc2626;
-      --text: #1f2937;
+      --text: #1a1a2e;
       --text-light: #6b7280;
-      --bg: #f8fafc;
+      --bg: #fafbfc;
       --card: #ffffff;
-      --border: #e2e8f0;
-      --shadow: 0 10px 40px rgba(15, 76, 129, 0.12);
-      --radius: 12px;
+      --border: #e5e7eb;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      --radius: 10px;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
     }
 
     .nav {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      background: var(--primary);
       color: white;
-      padding: 1rem 2rem;
+      padding: 1.25rem 2rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -47,7 +52,8 @@
       z-index: 100;
     }
 
-    .nav-brand { font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; }
+    .nav-brand { font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; letter-spacing: -0.02em; }
+    .nav-brand span { color: var(--accent); }
 
     .nav-links { display: flex; gap: 2rem; align-items: center; }
 
@@ -303,7 +309,7 @@
 <body>
 
 <nav class="nav" id="mainNav" style="display:none;">
-  <div class="nav-brand">⚡ HVAC Lead Pro</div>
+  <div class="nav-brand">AC<span>Connx</span></div>
   <div class="nav-links">
     <a onclick="showPage('dashboard')" class="active" id="nav-dashboard">Dashboard</a>
     <a onclick="showPage('leads')" id="nav-leads">My Leads</a>
@@ -318,12 +324,12 @@
 <div class="page active" id="page-auth">
   <div class="auth-container">
     <div class="auth-logo">
-      <h1>⚡ HVAC Lead Pro</h1>
-      <p>Get qualified AC installation leads</p>
+      <h1 style="font-size: 2rem; font-weight: 800; color: var(--primary); letter-spacing: -0.03em;">AC<span style="color: var(--accent);">Connx</span></h1>
+      <p style="color: var(--text-light); margin-top: 0.5rem;">Contractor Portal</p>
     </div>
 
     <div class="card" id="loginForm">
-      <h2>Contractor Login</h2>
+      <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem;">Sign In</h2>
       <div class="form-group">
         <label>Email</label>
         <input type="email" id="loginEmail" placeholder="your@company.com" />
@@ -332,9 +338,25 @@
         <label>Password</label>
         <input type="password" id="loginPassword" placeholder="••••••••" />
       </div>
-      <button class="btn btn-primary" style="width:100%" onclick="login()">Login</button>
+      <button class="btn btn-primary" style="width:100%" onclick="login()">Sign In</button>
+      <div style="text-align: center; margin-top: 1rem;">
+        <a onclick="showForgotPassword()" style="color: var(--accent); cursor: pointer; font-size: 0.875rem; font-weight: 500;">Forgot password?</a>
+      </div>
       <div class="auth-toggle">
         Don't have an account? <a onclick="toggleAuth('register')">Register</a>
+      </div>
+    </div>
+
+    <div class="card hidden" id="forgotPasswordForm">
+      <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem;">Reset Password</h2>
+      <p style="color: var(--text-light); margin-bottom: 1rem; font-size: 0.875rem;">Enter your email and we'll send you a reset link.</p>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="forgotEmail" placeholder="your@company.com" />
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="resetPassword()">Send Reset Link</button>
+      <div class="auth-toggle">
+        Remember your password? <a onclick="toggleAuth('login')">Sign In</a>
       </div>
     </div>
 
@@ -645,6 +667,24 @@ const CREDIT_PACKAGES = {
 function toggleAuth(mode) {
   document.getElementById('loginForm').classList.toggle('hidden', mode !== 'login');
   document.getElementById('registerForm').classList.toggle('hidden', mode !== 'register');
+  document.getElementById('forgotPasswordForm').classList.toggle('hidden', mode !== 'forgot');
+}
+
+function showForgotPassword() {
+  toggleAuth('forgot');
+}
+
+function resetPassword() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  if (!email) {
+    showToast('Please enter your email', 'error');
+    return;
+  }
+  
+  // In a real app, this would send an email
+  // For now, we'll just show a message
+  showToast('If an account exists, a reset link has been sent.', 'success');
+  toggleAuth('login');
 }
 
 async function register() {
