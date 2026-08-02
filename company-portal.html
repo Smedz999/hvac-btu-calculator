@@ -1082,19 +1082,7 @@ async function processPayment() {
       document.getElementById('card-errors').textContent = result.error.message;
       showToast(result.error.message, 'error');
     } else {
-      // Payment successful
-      const confirmRes = await fetch(`${API_URL}/confirm-payment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId: currentUser.id,
-          packageId: packageId,
-          credits: selectedPackage.credits,
-          amount: selectedPackage.price
-        })
-      });
-
-      // Always add credits locally (server may not have company in memory)
+      // Payment successful - add credits immediately
       currentUser.credits = (currentUser.credits || 0) + selectedPackage.credits;
       updateCurrentUser();
       
@@ -1110,22 +1098,19 @@ async function processPayment() {
       });
       localStorage.setItem('hvac_purchases', JSON.stringify(purchases));
       
-      // Try to sync with server (best effort)
-      try {
-        await fetch(`${API_URL}/confirm-payment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            companyId: currentUser.id,
-            packageId: packageId,
-            credits: selectedPackage.credits,
-            amount: selectedPackage.price
-          })
-        });
-      } catch (e) {
-        // Server sync failed but credits already added locally
-        console.log('Server sync failed, credits saved locally');
-      }
+      // Try to sync with server (best effort - don't wait for response)
+      fetch(`${API_URL}/confirm-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: currentUser.id,
+          packageId: packageId,
+          credits: selectedPackage.credits,
+          amount: selectedPackage.price
+        })
+      }).catch(() => {
+        // Server sync failed but credits already added locally - ignore error
+      });
       
       closePaymentModal();
       showToast(`Payment successful! ${selectedPackage.credits} credits added.`);
