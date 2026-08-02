@@ -1112,8 +1112,13 @@ async function processPayment() {
           credits: selectedPackage.credits,
           amount: selectedPackage.price
         })
-      }).catch(() => {
+      }).then(res => {
+        if (!res.ok) {
+          console.log('Server sync returned error status:', res.status);
+        }
+      }).catch(err => {
         // Server sync failed but credits already added locally - ignore error
+        console.log('Server sync failed:', err.message);
       });
       
       closePaymentModal();
