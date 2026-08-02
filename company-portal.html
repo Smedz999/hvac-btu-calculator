@@ -1015,7 +1015,10 @@ function showPayment(packageId) {
   if (!stripe && STRIPE_KEY && STRIPE_KEY.startsWith('pk_')) {
     stripe = Stripe(STRIPE_KEY);
     const elements = stripe.elements();
-    cardElement = elements.create('card', { style: { base: { fontSize: '16px' } } });
+    cardElement = elements.create('card', { 
+      style: { base: { fontSize: '16px' } },
+      hidePostalCode: true
+    });
     cardElement.mount('#card-element');
   }
 }
