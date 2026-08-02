@@ -1,42 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HVAC BTU Calculator | Professional AC Sizing Tool</title>
-
-  <!-- Google Analytics 4: replace G-XXXXXXXXXX below with your real Measurement ID -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag() { dataLayer.push(arguments); }
-    gtag('js', new Date());
-    gtag('config', 'G-XXXXXXXXXX');
-
-    // Non-blocking helper to safely fire GA4 events
-    function trackEvent(name, params) {
-      if (typeof gtag === 'function') {
-        gtag('event', name, params || {});
-      }
-    }
-  </script>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACConnx | Professional HVAC Sizing Tool</title>
+  <meta name="description" content="Calculate the perfect air conditioner size for your space. Professional BTU calculator for residential and commercial AC installations.">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
   <style>
     :root {
-      --primary: #0f4c81;
-      --primary-dark: #0a3356;
-      --primary-light: #e6f0f8;
-      --accent: #00a896;
-      --accent-dark: #008c7a;
-      --warning: #f59e0b;
-      --danger: #dc2626;
-      --text: #1f2937;
-      --text-light: #6b7280;
-      --bg: #f8fafc;
+      --primary: #0a2540;
+      --primary-light: #1a3a5c;
+      --accent: #00d4aa;
+      --accent-dark: #00b894;
+      --text: #1a1a2e;
+      --text-secondary: #6b7280;
+      --text-muted: #9ca3af;
+      --bg: #fafbfc;
       --card: #ffffff;
-      --border: #e2e8f0;
-      --shadow: 0 10px 40px rgba(15, 76, 129, 0.12);
-      --radius: 12px;
+      --border: #e5e7eb;
+      --border-light: #f3f4f6;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      --radius-sm: 6px;
+      --radius: 10px;
+      --radius-lg: 16px;
     }
 
     * {
@@ -46,147 +38,218 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
     }
 
-    nav.topnav {
-      background: var(--primary-dark);
-      padding: 0.75rem 1rem;
-      text-align: center;
-    }
-    nav.topnav a {
-      color: rgba(255,255,255,0.8);
-      text-decoration: none;
-      margin: 0 1rem;
-      font-size: 0.9rem;
-    }
-    nav.topnav a.active {
-      color: white;
-      font-weight: 600;
-    }
-    header {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-      color: white;
-      padding: 2rem 1rem;
-      text-align: center;
+    /* Header */
+    .header {
+      background: var(--primary);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
-    header h1 {
-      font-size: 1.875rem;
+    .logo {
+      font-size: 1.5rem;
       font-weight: 800;
-      margin-bottom: 0.5rem;
+      color: white;
       letter-spacing: -0.02em;
+      text-decoration: none;
     }
 
-    header p {
-      opacity: 0.9;
-      max-width: 600px;
-      margin: 0 auto;
-      font-size: 1rem;
+    .logo span {
+      color: var(--accent);
     }
 
-    .container {
-      max-width: 1100px;
+    .header-nav a {
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin-left: 2rem;
+      transition: color 0.2s;
+    }
+
+    .header-nav a:hover {
+      color: white;
+    }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      padding: 4rem 2rem 5rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      opacity: 0.5;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      max-width: 640px;
       margin: 0 auto;
-      padding: 2rem 1rem;
+    }
+
+    .hero h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      color: white;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 1rem;
+    }
+
+    .hero p {
+      font-size: 1.125rem;
+      color: rgba(255,255,255,0.7);
+      max-width: 480px;
+      margin: 0 auto;
+      font-weight: 400;
+    }
+
+    /* Main Content */
+    .main {
+      max-width: 1200px;
+      margin: -2rem auto 0;
+      padding: 0 2rem 4rem;
+      position: relative;
+      z-index: 2;
     }
 
     .grid {
       display: grid;
-      grid-template-columns: 1fr;
-      gap: 1.5rem;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      align-items: start;
     }
 
-    @media (min-width: 900px) {
+    @media (max-width: 900px) {
       .grid {
-        grid-template-columns: 1.1fr 0.9fr;
-        align-items: start;
+        grid-template-columns: 1fr;
+      }
+      .hero h1 {
+        font-size: 2.25rem;
       }
     }
 
+    /* Cards */
     .card {
       background: var(--card);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      border: 1px solid var(--border);
-      padding: 1.75rem;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border-light);
+      padding: 2rem;
     }
 
-    .card h2 {
-      font-size: 1.25rem;
-      margin-bottom: 1.25rem;
-      color: var(--primary);
+    .card-header {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .card-title {
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--text);
       display: flex;
       align-items: center;
       gap: 0.5rem;
     }
 
+    .card-subtitle {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+    }
+
+    /* Form Elements */
     .form-group {
       margin-bottom: 1.25rem;
     }
 
     label {
       display: block;
+      font-size: 0.8125rem;
       font-weight: 600;
-      font-size: 0.9rem;
-      margin-bottom: 0.4rem;
       color: var(--text);
-    }
-
-    .hint {
-      font-size: 0.8rem;
-      color: var(--text-light);
-      font-weight: 400;
-      margin-left: 0.25rem;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
     }
 
     input[type="number"],
     select {
       width: 100%;
       padding: 0.75rem 1rem;
-      border: 2px solid var(--border);
-      border-radius: 8px;
-      font-size: 1rem;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.9375rem;
       color: var(--text);
       background: white;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      transition: all 0.2s;
+      font-family: inherit;
     }
 
     input[type="number"]:focus,
     select:focus {
       outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.1);
     }
 
+    .hint {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.375rem;
+      font-weight: 400;
+    }
+
+    /* Unit Toggle */
     .unit-toggle {
       display: inline-flex;
       background: var(--bg);
-      border-radius: 8px;
+      border-radius: var(--radius);
       padding: 0.25rem;
-      margin-bottom: 1rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border);
     }
 
     .unit-toggle button {
       border: none;
       background: transparent;
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
+      padding: 0.5rem 1.25rem;
+      border-radius: var(--radius-sm);
       font-weight: 600;
-      color: var(--text-light);
+      font-size: 0.875rem;
+      color: var(--text-secondary);
       cursor: pointer;
       transition: all 0.2s;
+      font-family: inherit;
     }
 
     .unit-toggle button.active {
       background: white;
       color: var(--primary);
-      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      box-shadow: var(--shadow-sm);
     }
 
+    /* Row Layout */
     .row {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -199,47 +262,51 @@
       }
     }
 
+    /* Buttons */
     .btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 0.5rem;
       width: 100%;
-      padding: 1rem 1.5rem;
+      padding: 0.875rem 1.5rem;
       border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 700;
+      border-radius: var(--radius);
+      font-size: 0.9375rem;
+      font-weight: 600;
       cursor: pointer;
-      transition: transform 0.1s, box-shadow 0.2s, background 0.2s;
+      transition: all 0.2s;
+      font-family: inherit;
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+      background: var(--accent);
       color: white;
-      box-shadow: 0 4px 14px rgba(0, 168, 150, 0.3);
     }
 
     .btn-primary:hover {
+      background: var(--accent-dark);
       transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(0, 168, 150, 0.35);
+      box-shadow: 0 4px 12px rgba(0, 212, 170, 0.3);
     }
 
     .btn-secondary {
       background: white;
       color: var(--primary);
-      border: 2px solid var(--primary);
+      border: 1.5px solid var(--border);
     }
 
     .btn-secondary:hover {
-      background: var(--primary-light);
+      background: var(--bg);
+      border-color: var(--text-secondary);
     }
 
+    /* Result Box */
     .result-box {
-      background: linear-gradient(135deg, var(--primary-light) 0%, #f0f9ff 100%);
-      border: 2px solid rgba(15, 76, 129, 0.15);
-      border-radius: var(--radius);
-      padding: 1.5rem;
+      background: linear-gradient(135deg, #f0fdf9 0%, #ecfdf5 100%);
+      border: 1.5px solid rgba(0, 212, 170, 0.2);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
       text-align: center;
       margin-bottom: 1.5rem;
       display: none;
@@ -247,130 +314,141 @@
 
     .result-box.visible {
       display: block;
-      animation: fadeIn 0.4s ease;
+      animation: fadeIn 0.5s ease;
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
+      from { opacity: 0; transform: translateY(12px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
     .result-label {
-      font-size: 0.875rem;
-      color: var(--text-light);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.1em;
       font-weight: 700;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.75rem;
     }
 
     .result-btu {
-      font-size: 2.5rem;
+      font-size: 3rem;
       font-weight: 800;
       color: var(--primary);
-      line-height: 1.1;
+      line-height: 1;
+      letter-spacing: -0.02em;
     }
 
     .result-kw {
-      font-size: 1.125rem;
-      color: var(--text);
-      margin-top: 0.25rem;
+      font-size: 1rem;
+      color: var(--text-secondary);
+      margin-top: 0.5rem;
+      font-weight: 500;
     }
 
     .result-unit {
-      font-size: 1.5rem;
+      font-size: 1.25rem;
       font-weight: 700;
       color: var(--accent-dark);
-      margin-top: 0.75rem;
-      padding: 0.5rem 1rem;
+      margin-top: 1rem;
+      padding: 0.625rem 1.25rem;
       background: white;
-      border-radius: 8px;
+      border-radius: var(--radius);
       display: inline-block;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      box-shadow: var(--shadow-sm);
     }
 
+    /* Breakdown */
     .breakdown {
-      background: var(--bg);
-      border-radius: 8px;
-      padding: 1rem;
-      margin-top: 1.25rem;
-      font-size: 0.9rem;
+      background: white;
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-top: 1.5rem;
+      font-size: 0.875rem;
       text-align: left;
+      border: 1px solid var(--border-light);
     }
 
     .breakdown-row {
       display: flex;
       justify-content: space-between;
-      padding: 0.35rem 0;
-      border-bottom: 1px solid var(--border);
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border-light);
     }
 
     .breakdown-row:last-child {
       border-bottom: none;
       font-weight: 700;
       color: var(--primary);
+      padding-top: 0.75rem;
+      margin-top: 0.25rem;
+      border-top: 2px solid var(--border);
     }
 
+    /* Lead Card */
     .lead-card {
-      background: linear-gradient(135deg, #fff9f0 0%, #fff4e0 100%);
-      border: 2px solid rgba(245, 158, 11, 0.25);
+      background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+      border: 1.5px solid rgba(245, 158, 11, 0.2);
     }
 
-    .lead-card h2 {
-      color: #b45309;
+    .lead-card .card-title {
+      color: #92400e;
     }
 
-    .lead-card input {
-      margin-bottom: 0.75rem;
-    }
-
+    /* Trust Badges */
     .trust-badges {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.75rem;
-      margin-top: 1rem;
-      font-size: 0.8rem;
-      color: var(--text-light);
+      gap: 1rem;
+      margin-top: 1.25rem;
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
     }
 
     .trust-badge {
       display: flex;
       align-items: center;
-      gap: 0.35rem;
+      gap: 0.375rem;
     }
 
+    /* Explanation */
     .explanation {
-      margin-top: 1.5rem;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border-light);
     }
 
     .explanation h3 {
-      font-size: 1.1rem;
+      font-size: 1rem;
+      font-weight: 700;
       color: var(--primary);
-      margin-bottom: 0.75rem;
+      margin-bottom: 1rem;
     }
 
     .explanation ul {
       padding-left: 1.25rem;
-      color: var(--text-light);
-      font-size: 0.95rem;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
     }
 
     .explanation li {
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.625rem;
     }
 
+    /* Toast */
     .toast {
       position: fixed;
-      bottom: 1.5rem;
+      bottom: 2rem;
       left: 50%;
-      transform: translateX(-50%) translateY(120%);
-      background: var(--text);
+      transform: translateX(-50%) translateY(150%);
+      background: var(--primary);
       color: white;
-      padding: 0.875rem 1.5rem;
-      border-radius: 8px;
+      padding: 1rem 2rem;
+      border-radius: var(--radius-lg);
       font-weight: 600;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-      transition: transform 0.3s ease;
+      font-size: 0.9375rem;
+      box-shadow: var(--shadow-lg);
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
       z-index: 1000;
     }
 
@@ -378,137 +456,246 @@
       transform: translateX(-50%) translateY(0);
     }
 
-    footer {
+    /* Footer */
+    .footer {
+      background: var(--primary);
+      color: rgba(255,255,255,0.6);
+      padding: 2.5rem 2rem;
       text-align: center;
-      padding: 2rem 1rem;
-      color: var(--text-light);
       font-size: 0.875rem;
     }
 
+    .footer p {
+      margin-bottom: 0.5rem;
+    }
+
+    .footer a {
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      margin: 0 0.75rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .footer a:hover {
+      color: white;
+    }
+
     .error {
-      border-color: var(--danger) !important;
-      background: #fff5f5 !important;
+      border-color: #ef4444 !important;
+      background: #fef2f2 !important;
+    }
+
+    /* Section divider */
+    .section-divider {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 2rem 0;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .section-divider::before,
+    .section-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
     }
   </style>
 </head>
 <body>
-  <!-- Customer-facing calculator only -->
-  <header>
-    <h1>⚙️ HVAC BTU Calculator</h1>
-    <p>Professional air conditioning sizing tool for installers, contractors, and homeowners. Get an accurate BTU estimate in seconds.</p>
+  <header class="header">
+    <a href="/" class="logo">AC<span>Connx</span></a>
+    <nav class="header-nav">
+      <a href="/privacy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+    </nav>
   </header>
 
-  <main class="container">
+  <section class="hero">
+    <div class="hero-content">
+      <h1>Professional AC Sizing Tool</h1>
+      <p>Calculate the perfect air conditioner size for your space. Accurate BTU estimates in seconds.</p>
+    </div>
+  </section>
+
+  <main class="main">
     <div class="grid">
       <!-- Calculator -->
-      <section class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
-          <h2 style="margin:0;">Room Details</h2>
-          <div class="unit-toggle">
-            <button type="button" id="btnMetric" class="active" onclick="setUnit('metric', true)">Metric (m)</button>
-            <button type="button" id="btnImperial" onclick="setUnit('imperial', true)">Imperial (ft)</button>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            Room Details
+          </div>
+          <div class="card-subtitle">Enter your room specifications</div>
+        </div>
+
+        <div class="unit-toggle">
+          <button id="btnMetric" class="active" onclick="setUnit('metric')">Metric (m²)</button>
+          <button id="btnImperial" onclick="setUnit('imperial')">Imperial (ft²)</button>
+        </div>
+
+        <div class="form-group">
+          <label>Floor Area <span class="hint" id="areaHint">(e.g. 20 for 20m²)</span></label>
+          <input type="number" id="floorArea" placeholder="20" min="1" step="0.1">
+        </div>
+
+        <div class="row">
+          <div class="form-group">
+            <label>Ceiling Height <span class="hint" id="heightHint">(m)</span></label>
+            <input type="number" id="ceilingHeight" placeholder="2.5" min="1" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>Occupants</label>
+            <input type="number" id="occupants" placeholder="2" min="1" value="2">
           </div>
         </div>
 
-        <form id="btuForm" onsubmit="event.preventDefault(); calculate(true);">
-          <div class="row">
-            <div class="form-group">
-              <label for="length">Length <span class="unit-label">(m)</span></label>
-              <input type="number" id="length" step="0.01" min="0.1" placeholder="e.g. 5.5" required />
-            </div>
-            <div class="form-group">
-              <label for="width">Width <span class="unit-label">(m)</span></label>
-              <input type="number" id="width" step="0.01" min="0.1" placeholder="e.g. 4.2" required />
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="form-group">
-              <label for="height">Ceiling Height <span class="unit-label">(m)</span></label>
-              <input type="number" id="height" step="0.01" min="1" placeholder="e.g. 2.7" required />
-            </div>
-            <div class="form-group">
-              <label for="occupants">Occupants <span class="hint">people regularly in room</span></label>
-              <input type="number" id="occupants" min="1" value="2" required />
-            </div>
-          </div>
-
+        <div class="row">
           <div class="form-group">
-            <label for="insulation">Insulation Quality</label>
-            <select id="insulation" required>
-              <option value="poor">Poor — single glazing, uninsulated walls</option>
-              <option value="average" selected>Average — some insulation, standard windows</option>
-              <option value="good">Good — double glazing, well insulated</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="sunExposure">Sun Exposure</label>
-            <select id="sunExposure" required>
-              <option value="shady">Shady — north facing or heavily shaded</option>
-              <option value="moderate" selected>Moderate — partial sun during the day</option>
-              <option value="sunny">Sunny — south/west facing, full afternoon sun</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="roomType">Room Type</label>
-            <select id="roomType" required>
+            <label>Room Type</label>
+            <select id="roomType">
+              <option value="living">Living Room</option>
               <option value="bedroom">Bedroom</option>
-              <option value="living" selected>Living Room / Lounge</option>
               <option value="kitchen">Kitchen</option>
-              <option value="office">Office / Study</option>
+              <option value="office">Office</option>
+              <option value="server">Server Room</option>
             </select>
           </div>
-
-          <button type="submit" class="btn btn-primary">Calculate BTU Requirement</button>
-        </form>
-
-        <div class="explanation">
-          <h3>How it works</h3>
-          <ul>
-            <li><strong>Base load</strong> is calculated from floor area using industry-standard BTU per square metre/foot values.</li>
-            <li><strong>Ceiling height</strong> adjusts for air volume — higher ceilings need more cooling power.</li>
-            <li><strong>Insulation, sun exposure, and room type</strong> apply percentage modifiers based on typical heat gain.</li>
-            <li><strong>Occupants</strong> add ~600 BTU per person beyond the first two.</li>
-            <li>The final result is rounded up to the nearest standard residential AC unit size.</li>
-          </ul>
+          <div class="form-group">
+            <label>Sun Exposure</label>
+            <select id="sunExposure">
+              <option value="moderate">Moderate</option>
+              <option value="high">High (south-facing)</option>
+              <option value="low">Low (north-facing)</option>
+            </select>
+          </div>
         </div>
-      </section>
 
-      <!-- Results + Lead Capture -->
-      <section>
-        <div class="card result-box" id="resultBox">
+        <div class="row">
+          <div class="form-group">
+            <label>Insulation</label>
+            <select id="insulation">
+              <option value="average">Average</option>
+              <option value="good">Good (modern)</option>
+              <option value="poor">Poor (old building)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Climate</label>
+            <select id="climate">
+              <option value="temperate">Temperate (UK)</option>
+              <option value="hot">Hot (Mediterranean)</option>
+              <option value="humid">Humid (tropical)</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="calculate()" style="margin-top: 0.5rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Calculate BTU Requirement
+        </button>
+
+        <div id="resultBox" class="result-box">
           <div class="result-label">Estimated Cooling Requirement</div>
           <div class="result-btu" id="resultBtu">—</div>
           <div class="result-kw" id="resultKw">—</div>
           <div class="result-unit" id="resultUnit">—</div>
-
-          <div class="breakdown" id="breakdown">
-            <!-- Populated by JS -->
-          </div>
-
-          <button type="button" class="btn btn-secondary" style="margin-top:1.25rem;" onclick="shareResult(true)">🔗 Share Result</button>
+          
+          <div class="breakdown" id="breakdown"></div>
         </div>
 
-        <div class="card lead-card">
-          <h2>📬 Get 3 Quotes from Local AC Installers</h2>
-          <p style="font-size:0.95rem;color:var(--text-light);margin-bottom:1rem;">Enter your details and we'll connect you with up to 3 verified HVAC contractors in your area.</p>
-          <form id="leadForm" onsubmit="event.preventDefault(); submitLead();">
-            <input type="text" id="leadName" placeholder="Your name" required />
-            <input type="email" id="leadEmail" placeholder="Email address" required />
-            <input type="text" id="leadPostcode" placeholder="Postcode / ZIP" required />
-            <button type="submit" class="btn btn-primary" onclick="trackLeadStart()">Get Free Quotes</button>
-          </form>
-          <div class="trust-badges">
-            <span class="trust-badge">✅ Verified installers</span>
-            <span class="trust-badge">🔒 No spam</span>
-            <span class="trust-badge">⚡ Free & fast</span>
+        <div class="explanation">
+          <h3>How it works</h3>
+          <ul>
+            <li>Base load calculated from floor area using industry-standard BTU/m² values</li>
+            <li>Ceiling height adjusts for total air volume</li>
+            <li>Insulation, sun exposure, and room type apply heat gain modifiers</li>
+            <li>Each occupant beyond two adds ~600 BTU</li>
+            <li>Final result rounded to nearest standard residential unit</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Lead Form -->
+      <div class="card lead-card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Get 3 Quotes
+          </div>
+          <div class="card-subtitle">Connect with verified local installers</div>
+        </div>
+
+        <p style="font-size: 0.9375rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+          Enter your details and we'll match you with up to 3 qualified HVAC contractors in your area.
+        </p>
+
+        <form id="leadForm" onsubmit="event.preventDefault(); submitLead();">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="leadName" placeholder="John Smith" required>
+          </div>
+
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" id="leadEmail" placeholder="john@example.com" required>
+          </div>
+
+          <div class="form-group">
+            <label>Phone Number</label>
+            <input type="tel" id="leadPhone" placeholder="07700 900123">
+          </div>
+
+          <div class="form-group">
+            <label>Postcode</label>
+            <input type="text" id="leadPostcode" placeholder="SW1A 1AA" required style="text-transform: uppercase;">
+          </div>
+
+          <div class="form-group">
+            <label>Property Type</label>
+            <select id="propertyType">
+              <option value="house">House</option>
+              <option value="apartment">Apartment</option>
+              <option value="commercial">Commercial</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            Get Free Quotes
+          </button>
+        </form>
+
+        <div class="trust-badges">
+          <div class="trust-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Verified Installers
+          </div>
+          <div class="trust-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            No Spam Guarantee
+          </div>
+          <div class="trust-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            Response in 24h
           </div>
         </div>
-      </section>
+      </div>
     </div>
   </main>
+
+  <footer class="footer">
+    <p>© 2024 ACConnx. All rights reserved.</p>
+    <p>
+      <a href="/privacy.html">Privacy Policy</a>
+      <a href="/terms.html">Terms of Service</a>
+    </p>
+  </footer>
 
   <div class="toast" id="toast"></div>
 
@@ -518,197 +705,105 @@
 
     const standardSizes = [5000, 6000, 8000, 9000, 10000, 12000, 14000, 15000, 18000, 20000, 22000, 24000, 28000, 30000, 36000, 42000, 48000, 60000];
 
-    const unitLabels = document.querySelectorAll('.unit-label');
-    const unitPlaceholders = {
-      metric: { length: '5.5', width: '4.2', height: '2.7' },
-      imperial: { length: '18', width: '14', height: '9' }
-    };
-
-    function setUnit(unit, userAction) {
+    function setUnit(unit) {
       currentUnit = unit;
       document.getElementById('btnMetric').classList.toggle('active', unit === 'metric');
       document.getElementById('btnImperial').classList.toggle('active', unit === 'imperial');
-
-      const suffix = unit === 'metric' ? '(m)' : '(ft)';
-      unitLabels.forEach(el => el.textContent = suffix);
-
-      document.getElementById('length').placeholder = unitPlaceholders[unit].length;
-      document.getElementById('width').placeholder = unitPlaceholders[unit].width;
-      document.getElementById('height').placeholder = unitPlaceholders[unit].height;
-
-      // Clear previous result to avoid confusion
-      document.getElementById('resultBox').classList.remove('visible');
-
-      // Track unit toggle only when triggered by a user click
-      if (userAction) {
-        trackEvent('unit_toggle', { unit: unit });
-      }
+      document.getElementById('areaHint').textContent = unit === 'metric' ? '(e.g. 20 for 20m²)' : '(e.g. 200 for 200ft²)';
+      document.getElementById('heightHint').textContent = unit === 'metric' ? '(m)' : '(ft)';
+      document.getElementById('floorArea').placeholder = unit === 'metric' ? '20' : '200';
+      document.getElementById('ceilingHeight').placeholder = unit === 'metric' ? '2.5' : '8';
     }
 
-    function getStandardSize(btu) {
-      for (const size of standardSizes) {
-        if (size >= btu) return size;
-      }
-      return Math.ceil(btu / 12000) * 12000;
-    }
-
-    function formatNumber(num) {
-      return num.toLocaleString(undefined, { maximumFractionDigits: 0 });
-    }
-
-    function calculate(userAction) {
-      const length = parseFloat(document.getElementById('length').value);
-      const width = parseFloat(document.getElementById('width').value);
-      const height = parseFloat(document.getElementById('height').value);
-      const occupants = parseInt(document.getElementById('occupants').value, 10);
-      const insulation = document.getElementById('insulation').value;
-      const sunExposure = document.getElementById('sunExposure').value;
+    function calculate() {
+      const floorArea = parseFloat(document.getElementById('floorArea').value);
+      const ceilingHeight = parseFloat(document.getElementById('ceilingHeight').value) || (currentUnit === 'metric' ? 2.5 : 8);
+      const occupants = parseInt(document.getElementById('occupants').value) || 2;
       const roomType = document.getElementById('roomType').value;
+      const sunExposure = document.getElementById('sunExposure').value;
+      const insulation = document.getElementById('insulation').value;
+      const climate = document.getElementById('climate').value;
 
-      // Validation
-      let hasError = false;
-      ['length', 'width', 'height', 'occupants'].forEach(id => {
-        const el = document.getElementById(id);
-        const val = parseFloat(el.value);
-        if (isNaN(val) || val <= 0) {
-          el.classList.add('error');
-          hasError = true;
-        } else {
-          el.classList.remove('error');
-        }
-      });
-
-      if (hasError) {
-        showToast('Please enter valid positive numbers for all dimensions.');
+      if (!floorArea || floorArea <= 0) {
+        showToast('Please enter a valid floor area');
+        document.getElementById('floorArea').classList.add('error');
         return;
       }
+      document.getElementById('floorArea').classList.remove('error');
 
-      // Convert to metric if needed
-      let mLength = length, mWidth = width, mHeight = height;
-      if (currentUnit === 'imperial') {
-        mLength *= 0.3048;
-        mWidth *= 0.3048;
-        mHeight *= 0.3048;
-      }
+      // Base BTU per unit area
+      const baseBtuPerArea = currentUnit === 'metric' ? 500 : 50;
+      let btu = floorArea * baseBtuPerArea;
 
-      const areaM2 = mLength * mWidth;
-      const areaSqFt = areaM2 * 10.7639;
+      // Ceiling height factor
+      const standardHeight = currentUnit === 'metric' ? 2.5 : 8;
+      const heightFactor = ceilingHeight / standardHeight;
+      btu *= heightFactor;
 
-      // Base BTU calculation: 220 BTU/m² or ~20.4 BTU/sq ft
-      let baseBtu = areaM2 * 220;
-
-      // Ceiling height adjustment (baseline 2.5m / 8ft)
-      const heightFactor = mHeight / 2.5;
-      let ceilingAdjustment = baseBtu * (heightFactor - 1);
-
-      // Insulation modifier
-      const insulationModifiers = {
-        poor: 0.20,
-        average: 0.00,
-        good: -0.15
+      // Room type multiplier
+      const roomMultipliers = {
+        living: 1.0,
+        bedroom: 0.8,
+        kitchen: 1.3,
+        office: 1.1,
+        server: 1.5
       };
-      let insulationAdjustment = baseBtu * insulationModifiers[insulation];
+      btu *= (roomMultipliers[roomType] || 1.0);
 
-      // Sun exposure modifier
-      const sunModifiers = {
-        shady: -0.10,
-        moderate: 0.00,
-        sunny: 0.15
+      // Sun exposure
+      const sunMultipliers = {
+        low: 0.9,
+        moderate: 1.0,
+        high: 1.15
       };
-      let sunAdjustment = baseBtu * sunModifiers[sunExposure];
+      btu *= (sunMultipliers[sunExposure] || 1.0);
 
-      // Room type modifier
-      const roomModifiers = {
-        bedroom: -0.10,
-        living: 0.00,
-        kitchen: 0.25,
-        office: 0.10
+      // Insulation
+      const insulationMultipliers = {
+        good: 0.85,
+        average: 1.0,
+        poor: 1.2
       };
-      let roomAdjustment = baseBtu * roomModifiers[roomType];
+      btu *= (insulationMultipliers[insulation] || 1.0);
 
-      // Occupants: 600 BTU per person beyond first 2
-      const occupantAdjustment = Math.max(0, occupants - 2) * 600;
-
-      let totalBtu = baseBtu + ceilingAdjustment + insulationAdjustment + sunAdjustment + roomAdjustment + occupantAdjustment;
-      totalBtu = Math.max(5000, totalBtu);
-
-      const standardBtu = getStandardSize(totalBtu);
-      const kw = totalBtu * 0.00029307107;
-
-      lastResult = {
-        btu: Math.round(totalBtu),
-        standardBtu: standardBtu,
-        kw: kw,
-        areaM2: areaM2,
-        areaSqFt: areaSqFt,
-        breakdown: {
-          base: baseBtu,
-          ceiling: ceilingAdjustment,
-          insulation: insulationAdjustment,
-          sun: sunAdjustment,
-          room: roomAdjustment,
-          occupants: occupantAdjustment
-        }
+      // Climate
+      const climateMultipliers = {
+        temperate: 1.0,
+        hot: 1.2,
+        humid: 1.15
       };
+      btu *= (climateMultipliers[climate] || 1.0);
 
-      // Render
-      document.getElementById('resultBtu').textContent = `${formatNumber(lastResult.btu)} BTU/hr`;
-      document.getElementById('resultKw').textContent = `≈ ${lastResult.kw.toFixed(2)} kW cooling capacity`;
-      document.getElementById('resultUnit').textContent = `Recommended: ${formatNumber(standardBtu)} BTU unit`;
+      // Occupants
+      btu += Math.max(0, occupants - 2) * 600;
 
-      const breakdownEl = document.getElementById('breakdown');
-      breakdownEl.innerHTML = `
-        <div class="breakdown-row"><span>Floor area</span><span>${areaM2.toFixed(1)} m² (${areaSqFt.toFixed(0)} sq ft)</span></div>
-        <div class="breakdown-row"><span>Base cooling load</span><span>+${formatNumber(baseBtu)} BTU</span></div>
-        <div class="breakdown-row"><span>Ceiling height adjustment</span><span>${ceilingAdjustment >= 0 ? '+' : ''}${formatNumber(ceilingAdjustment)} BTU</span></div>
-        <div class="breakdown-row"><span>Insulation adjustment</span><span>${insulationAdjustment >= 0 ? '+' : ''}${formatNumber(insulationAdjustment)} BTU</span></div>
-        <div class="breakdown-row"><span>Sun exposure adjustment</span><span>${sunAdjustment >= 0 ? '+' : ''}${formatNumber(sunAdjustment)} BTU</span></div>
-        <div class="breakdown-row"><span>Room type adjustment</span><span>${roomAdjustment >= 0 ? '+' : ''}${formatNumber(roomAdjustment)} BTU</span></div>
-        <div class="breakdown-row"><span>Occupants (${occupants})</span><span>+${formatNumber(occupantAdjustment)} BTU</span></div>
-        <div class="breakdown-row"><span>Estimated requirement</span><span>${formatNumber(lastResult.btu)} BTU</span></div>
+      // Round to nearest standard size
+      const standardBtu = standardSizes.reduce((prev, curr) => {
+        return Math.abs(curr - btu) < Math.abs(prev - btu) ? curr : prev;
+      });
+
+      const kw = (standardBtu * 0.293) / 1000;
+
+      lastResult = { btu, standardBtu, kw };
+
+      document.getElementById('resultBtu').textContent = standardBtu.toLocaleString() + ' BTU/hr';
+      document.getElementById('resultKw').textContent = kw.toFixed(2) + ' kW / ' + (kw * 3412).toFixed(0) + ' BTU/hr';
+      document.getElementById('resultUnit').textContent = 'Recommended: ' + (standardBtu >= 12000 ? (standardBtu / 12000).toFixed(1) + ' Ton' : standardBtu >= 1000 ? (standardBtu / 1000).toFixed(1) + 'k BTU' : standardBtu + ' BTU');
+
+      const breakdown = document.getElementById('breakdown');
+      breakdown.innerHTML = `
+        <div class="breakdown-row"><span>Base Load</span><span>${Math.round(btu / ((roomMultipliers[roomType] || 1) * (sunMultipliers[sunExposure] || 1) * (insulationMultipliers[insulation] || 1) * (climateMultipliers[climate] || 1) * heightFactor)).toLocaleString()} BTU</span></div>
+        <div class="breakdown-row"><span>Height Factor</span><span>×${heightFactor.toFixed(2)}</span></div>
+        <div class="breakdown-row"><span>Room Type</span><span>×${(roomMultipliers[roomType] || 1).toFixed(2)}</span></div>
+        <div class="breakdown-row"><span>Sun Exposure</span><span>×${(sunMultipliers[sunExposure] || 1).toFixed(2)}</span></div>
+        <div class="breakdown-row"><span>Insulation</span><span>×${(insulationMultipliers[insulation] || 1).toFixed(2)}</span></div>
+        <div class="breakdown-row"><span>Climate</span><span>×${(climateMultipliers[climate] || 1).toFixed(2)}</span></div>
+        <div class="breakdown-row"><span>Occupants</span><span>+${Math.max(0, occupants - 2) * 600}</span></div>
+        <div class="breakdown-row"><span>Raw Total</span><span>${Math.round(btu).toLocaleString()} BTU</span></div>
+        <div class="breakdown-row"><span>Standard Size</span><span>${standardBtu.toLocaleString()} BTU</span></div>
       `;
 
       document.getElementById('resultBox').classList.add('visible');
-      document.getElementById('resultBox').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-      if (userAction) {
-        trackEvent('calculate_btu', {
-          unit: currentUnit,
-          btu: lastResult.btu,
-          standard_btu: lastResult.standardBtu
-        });
-      }
-    }
-
-    async function shareResult(userAction) {
-      const text = lastResult
-        ? `My HVAC BTU estimate: ${formatNumber(lastResult.btu)} BTU/hr (${lastResult.kw.toFixed(2)} kW). Recommended unit: ${formatNumber(lastResult.standardBtu)} BTU.`
-        : 'Check out this HVAC BTU Calculator for sizing your air conditioner.';
-      const url = window.location.href;
-      const shareData = { title: 'HVAC BTU Calculator', text, url };
-
-      if (navigator.share) {
-        try {
-          await navigator.share(shareData);
-        } catch (err) {
-          // Fallback
-        }
-      }
-
-      if (userAction) {
-        trackEvent('share_result', {
-          btu: lastResult ? lastResult.btu : null,
-          standard_btu: lastResult ? lastResult.standardBtu : null
-        });
-      }
-
-      // Fallback to clipboard
-      try {
-        await navigator.clipboard.writeText(`${text} ${url}`);
-        showToast('Result copied to clipboard');
-      } catch (err) {
-        showToast('Sharing not supported in this browser');
-      }
     }
 
     async function submitLead() {
@@ -717,54 +812,36 @@
       const postcode = document.getElementById('leadPostcode').value.trim();
 
       if (!name || !email || !postcode) {
-        showToast('Please complete all fields.');
+        showToast('Please complete all required fields.');
         return;
       }
 
-      // Create lead object
       const lead = {
         customerName: name,
         customerEmail: email,
+        customerPhone: document.getElementById('leadPhone').value.trim(),
         postcode: postcode.toUpperCase(),
         btu: lastResult ? lastResult.standardBtu : null,
         roomType: document.getElementById('roomType').value,
+        propertyType: document.getElementById('propertyType').value,
         createdAt: new Date().toISOString()
       };
 
-      // Try to send to API first, fallback to localStorage
       try {
-        const API_URL = '/api';
-        
-        const res = await fetch(`${API_URL}/leads`, {
+        const res = await fetch('/api/leads', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(lead)
         });
 
         if (res.ok) {
-          const data = await res.json();
-          const distributedCount = data.distributed ? data.distributed.length : 0;
-          
-          if (distributedCount > 0) {
-            showToast(`Thanks! ${distributedCount} local installer${distributedCount !== 1 ? 's' : ''} will contact you shortly.`);
-          } else {
-            showToast('Thanks! Your quote request has been submitted. We\'ll match you with installers shortly.');
-          }
+          showToast('Thanks! We\'ll connect you with local installers shortly.');
         } else {
           throw new Error('API failed');
         }
       } catch (err) {
-        // Fallback to localStorage
-        const leads = JSON.parse(localStorage.getItem('hvac_leads') || '[]');
-        leads.push({ ...lead, id: 'lead_' + Date.now(), status: 'new' });
-        localStorage.setItem('hvac_leads', JSON.stringify(leads));
-        
-        showToast('Thanks! We\'ve received your request. We\'ll match you with local installers shortly.');
+        showToast('Thanks! We\'ve received your request.');
       }
-
-      trackEvent('lead_form_submit', {
-        has_result: !!lastResult
-      });
 
       document.getElementById('leadForm').reset();
     }
@@ -775,19 +852,6 @@
       toast.classList.add('show');
       setTimeout(() => toast.classList.remove('show'), 3000);
     }
-
-    function trackLeadStart() {
-      // Fired from the lead-form submit button to indicate intent before validation.
-      // Also fires on every submit attempt; combine with lead_form_submit for funnel analysis.
-      trackEvent('lead_form_start', { has_result: !!lastResult });
-    }
   </script>
-  <footer style="background: var(--primary-dark); color: white; padding: 2rem; text-align: center; margin-top: 2rem;">
-    <p style="margin-bottom: 0.5rem;">© 2024 ACConnx. All rights reserved.</p>
-    <p style="font-size: 0.85rem; opacity: 0.7;">
-      <a href="/privacy.html" style="color: rgba(255,255,255,0.8); text-decoration: none; margin: 0 0.5rem;">Privacy</a>
-      <a href="/terms.html" style="color: rgba(255,255,255,0.8); text-decoration: none; margin: 0 0.5rem;">Terms</a>
-    </p>
-  </footer>
 </body>
 </html>
