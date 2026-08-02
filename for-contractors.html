@@ -22,6 +22,21 @@
       --shadow: 0 10px 40px rgba(15, 76, 129, 0.12);
       --radius: 12px;
     }
+    nav.topnav {
+      background: var(--primary-dark);
+      padding: 0.75rem 1rem;
+      text-align: center;
+    }
+    nav.topnav a {
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      margin: 0 1rem;
+      font-size: 0.9rem;
+    }
+    nav.topnav a.active {
+      color: white;
+      font-weight: 600;
+    }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -419,6 +434,7 @@
   </style>
 </head>
 <body>
+  <!-- Contractor portal only -->
 
 <!-- Hero -->
 <section class="hero">
@@ -643,12 +659,14 @@
 <!-- Footer -->
 <footer>
   <div class="footer-links">
-    <a href="index.html">Customer Calculator</a>
     <a href="company-portal.html">Contractor Login</a>
     <a href="admin.html">Admin</a>
   </div>
-  <p>© 2024 HVAC Lead Pro. All rights reserved.</p>
-  <p style="margin-top:0.5rem;opacity:0.7;">For HVAC contractors who want more jobs without the hassle.</p>
+  <p>© 2024 ACConnx. All rights reserved.</p>
+  <p style="margin-top:0.5rem;opacity:0.7;">
+    <a href="/privacy.html" style="color: rgba(255,255,255,0.8); text-decoration: none; margin: 0 0.5rem;">Privacy</a>
+    <a href="/terms.html" style="color: rgba(255,255,255,0.8); text-decoration: none; margin: 0 0.5rem;">Terms</a>
+  </p>
 </footer>
 
 </body>

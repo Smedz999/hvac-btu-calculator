@@ -91,10 +91,10 @@ app.post('/api/companies/register', async (req, res) => {
   if (resend) {
     try {
       await resend.emails.send({
-        from: 'HVAC Lead Pro <onboarding@resend.dev>',
+        from: 'ACConnx <onboarding@acconnx.com>',
         to: email,
         subject: 'Welcome to HVAC Lead Pro!',
-        html: `<h1>Welcome ${name}!</h1><p>Your company ${company} is now registered. Buy credits to start receiving qualified leads.</p><p><a href="https://hvac-calculator-opal.vercel.app/company-portal.html">Login to your dashboard</a></p>`
+        html: `<h1>Welcome ${name}!</h1><p>Your company ${company} is now registered. Buy credits to start receiving qualified leads.</p><p><a href="https://acconnx.com/company-portal.html">Login to your dashboard</a></p>`
       });
     } catch (e) {
       console.log('Failed to send welcome email:', e.message);
@@ -152,7 +152,7 @@ app.post('/api/leads', async (req, res) => {
   // Auto-distribute to matching companies
   const distributed = await distributeLead(lead);
 
-  res.json({ success: true, lead, distributed });
+  res.json({ success: true, lead, distributed: distributed || [] });
 });
 
 app.get('/api/leads', (req, res) => {
@@ -226,10 +226,10 @@ app.post('/api/confirm-payment', async (req, res) => {
   if (resend) {
     try {
       await resend.emails.send({
-        from: 'HVAC Lead Pro <receipts@resend.dev>',
+        from: 'ACConnx <receipts@acconnx.com>',
         to: company.email,
         subject: 'Payment Confirmation - HVAC Lead Pro',
-        html: `<h1>Thank you for your purchase!</h1><p>You bought ${credits} credits for £${amount / 100}.</p><p>Your new balance: ${company.credits} credits</p><p><a href="https://hvac-calculator-opal.vercel.app/company-portal.html">View Dashboard</a></p>`
+        html: `<h1>Thank you for your purchase!</h1><p>You bought ${credits} credits for £${amount / 100}.</p><p>Your new balance: ${company.credits} credits</p><p><a href="https://acconnx.com/company-portal.html">View Dashboard</a></p>`
       });
     } catch (e) {
       console.log('Failed to send receipt:', e.message);
@@ -297,7 +297,7 @@ async function distributeLead(lead) {
     if (resend && company.notifyEmail !== false) {
       try {
         await resend.emails.send({
-          from: 'HVAC Lead Pro <leads@resend.dev>',
+          from: 'ACConnx <leads@acconnx.com>',
           to: company.email,
           subject: '🔥 New Lead: ' + lead.customerName + ' - ' + lead.postcode,
           html: `<h1>New Lead Alert!</h1>
@@ -307,7 +307,7 @@ async function distributeLead(lead) {
             <p><strong>Postcode:</strong> ${lead.postcode}</p>
             <p><strong>BTU Required:</strong> ${lead.btu?.toLocaleString() || 'Not calculated'}</p>
             <p><strong>Room Type:</strong> ${lead.roomType || 'Not specified'}</p>
-            <p><a href="https://hvac-calculator-opal.vercel.app/company-portal.html">View in Dashboard</a></p>
+            <p><a href="https://acconnx.com/company-portal.html">View in Dashboard</a></p>
             <p><em>Contact within 15 minutes for best results!</em></p>`
         });
       } catch (e) {
@@ -323,7 +323,7 @@ async function distributeLead(lead) {
 // START SERVER
 // =====================
 app.listen(port, () => {
-  console.log(`🚀 HVAC Lead Pro API running on port ${port}`);
+  console.log(`🚀 ACConnx API running on port ${port}`);
   console.log(`📊 Health check: http://localhost:${port}/api/health`);
   console.log(`💳 Stripe: ${stripe ? '✅ Connected' : '⚠️ Not configured (add STRIPE_SECRET_KEY)'}`);
   console.log(`📧 Resend: ${resend ? '✅ Connected' : '⚠️ Not configured (add RESEND_API_KEY)'}`);

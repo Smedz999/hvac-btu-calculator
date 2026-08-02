@@ -52,6 +52,21 @@
       line-height: 1.6;
     }
 
+    nav.topnav {
+      background: var(--primary-dark);
+      padding: 0.75rem 1rem;
+      text-align: center;
+    }
+    nav.topnav a {
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      margin: 0 1rem;
+      font-size: 0.9rem;
+    }
+    nav.topnav a.active {
+      color: white;
+      font-weight: 600;
+    }
     header {
       background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
       color: white;
@@ -377,6 +392,7 @@
   </style>
 </head>
 <body>
+  <!-- Customer-facing calculator only -->
   <header>
     <h1>⚙️ HVAC BTU Calculator</h1>
     <p>Professional air conditioning sizing tool for installers, contractors, and homeowners. Get an accurate BTU estimate in seconds.</p>
@@ -722,9 +738,7 @@
 
       // Try to send to API first, fallback to localStorage
       try {
-        const API_URL = window.location.hostname === 'localhost' 
-          ? 'http://localhost:3001/api' 
-          : 'https://hvac-lead-pro-api.up.railway.app/api';
+        const API_URL = '/api';
         
         const res = await fetch(`${API_URL}/leads`, {
           method: 'POST',
@@ -750,7 +764,7 @@
         leads.push({ ...lead, id: 'lead_' + Date.now(), status: 'new' });
         localStorage.setItem('hvac_leads', JSON.stringify(leads));
         
-        showToast('Thanks! Your quote request has been submitted. Up to 3 local installers will contact you shortly.');
+        showToast('Thanks! We\'ve received your request. We\'ll match you with local installers shortly.');
       }
 
       trackEvent('lead_form_submit', {
@@ -773,5 +787,12 @@
       trackEvent('lead_form_start', { has_result: !!lastResult });
     }
   </script>
+  <footer style="background: var(--primary-dark); color: white; padding: 2rem; text-align: center; margin-top: 2rem;">
+    <p style="margin-bottom: 0.5rem;">© 2024 ACConnx. All rights reserved.</p>
+    <p style="font-size: 0.85rem; opacity: 0.7;">
+      <a href="/privacy.html" style="color: rgba(255,255,255,0.8); text-decoration: none; margin: 0 0.5rem;">Privacy</a>
+      <a href="/terms.html" style="color: rgba(255,255,255,0.8); text-decoration: none; margin: 0 0.5rem;">Terms</a>
+    </p>
+  </footer>
 </body>
 </html>
