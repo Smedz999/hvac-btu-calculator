@@ -320,11 +320,16 @@ async function distributeLead(lead) {
 }
 
 // =====================
-// START SERVER
+// START SERVER (for local dev)
 // =====================
-app.listen(port, () => {
-  console.log(`🚀 ACConnx API running on port ${port}`);
-  console.log(`📊 Health check: http://localhost:${port}/api/health`);
-  console.log(`💳 Stripe: ${stripe ? '✅ Connected' : '⚠️ Not configured (add STRIPE_SECRET_KEY)'}`);
-  console.log(`📧 Resend: ${resend ? '✅ Connected' : '⚠️ Not configured (add RESEND_API_KEY)'}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(port, () => {
+    console.log(`🚀 ACConnx API running on port ${port}`);
+    console.log(`📊 Health check: http://localhost:${port}/api/health`);
+    console.log(`💳 Stripe: ${stripe ? '✅ Connected' : '⚠️ Not configured (add STRIPE_SECRET_KEY)'}`);
+    console.log(`📧 Resend: ${resend ? '✅ Connected' : '⚠️ Not configured (add RESEND_API_KEY)'}`);
+  });
+}
+
+// Export for Vercel serverless
+module.exports = app;

@@ -1,8 +1,8 @@
 {
   "name": "hvac-lead-pro-api",
   "version": "1.0.0",
-  "description": "HVAC Lead Pro Backend API",
-  "main": "server.js",
+  "description": "ACConnx Backend API",
+  "main": "index.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
