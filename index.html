@@ -358,6 +358,17 @@
       box-shadow: var(--shadow-sm);
     }
 
+    .result-kw-highlight {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-top: 0.75rem;
+      padding: 0.5rem 1rem;
+      background: rgba(0, 212, 170, 0.1);
+      border-radius: var(--radius);
+      display: inline-block;
+    }
+
     /* Breakdown */
     .breakdown {
       background: white;
@@ -616,6 +627,7 @@
           <div class="result-btu" id="resultBtu">—</div>
           <div class="result-kw" id="resultKw">—</div>
           <div class="result-unit" id="resultUnit">—</div>
+          <div class="result-kw-highlight" id="resultKwHighlight">—</div>
           
           <div class="breakdown" id="breakdown"></div>
         </div>
@@ -839,8 +851,9 @@
       lastResult = { btu, standardBtu, kw };
 
       document.getElementById('resultBtu').textContent = standardBtu.toLocaleString() + ' BTU/hr';
-      document.getElementById('resultKw').textContent = kw.toFixed(2) + ' kW / ' + (kw * 3412).toFixed(0) + ' BTU/hr';
+      document.getElementById('resultKw').textContent = kw.toFixed(2) + ' kW';
       document.getElementById('resultUnit').textContent = 'Recommended: ' + (standardBtu >= 12000 ? (standardBtu / 12000).toFixed(1) + ' Ton' : standardBtu >= 1000 ? (standardBtu / 1000).toFixed(1) + 'k BTU' : standardBtu + ' BTU');
+      document.getElementById('resultKwHighlight').textContent = kw.toFixed(1) + ' kW System';
 
       const breakdown = document.getElementById('breakdown');
       breakdown.innerHTML = `
