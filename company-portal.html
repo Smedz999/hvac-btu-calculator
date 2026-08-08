@@ -505,15 +505,16 @@
 <!-- BUY CREDITS PAGE -->
 <div class="page" id="page-buy">
   <div class="container">
-    <h1 style="margin-bottom:1.5rem;">Buy Lead Credits</h1>
+    <h1 style="margin-bottom:0.5rem;">Buy Lead Credits</h1>
+    <p style="color:var(--text-light);margin-bottom:1.5rem;">🎉 <strong>First purchase gets 20% off</strong> — discount applied automatically at checkout.</p>
 
     <div class="pricing-grid">
       <div class="pricing-card">
         <div class="pricing-name">Starter</div>
-        <div class="pricing-price">£25 <span>/ 5 leads</span></div>
+        <div class="pricing-price">£49.99 <span>/ 5 leads</span></div>
         <ul class="pricing-features">
           <li>5 qualified leads</li>
-          <li>£5 per lead</li>
+          <li>£10 per lead</li>
           <li>Email notifications</li>
           <li>Basic lead details</li>
         </ul>
@@ -522,10 +523,10 @@
 
       <div class="pricing-card featured">
         <div class="pricing-name">Professional</div>
-        <div class="pricing-price">£60 <span>/ 15 leads</span></div>
+        <div class="pricing-price">£129.99 <span>/ 15 leads</span></div>
         <ul class="pricing-features">
           <li>15 qualified leads</li>
-          <li>£4 per lead (save 20%)</li>
+          <li>£8.67 per lead (save 13%)</li>
           <li>Instant SMS + email alerts</li>
           <li>Full customer details</li>
           <li>Priority matching</li>
@@ -535,10 +536,10 @@
 
       <div class="pricing-card">
         <div class="pricing-name">Business</div>
-        <div class="pricing-price">£100 <span>/ 30 leads</span></div>
+        <div class="pricing-price">£199.99 <span>/ 30 leads</span></div>
         <ul class="pricing-features">
           <li>30 qualified leads</li>
-          <li>£3.33 per lead (save 33%)</li>
+          <li>£6.67 per lead (save 33%)</li>
           <li>Instant SMS + email alerts</li>
           <li>Full customer details</li>
           <li>Priority matching</li>
@@ -659,9 +660,9 @@ let cardElement = null;
 let selectedPackage = null;
 
 const CREDIT_PACKAGES = {
-  starter: { name: 'Starter', credits: 5, price: 2500, priceDisplay: '£25' },
-  professional: { name: 'Professional', credits: 15, price: 6000, priceDisplay: '£60' },
-  business: { name: 'Business', credits: 30, price: 10000, priceDisplay: '£100' }
+  starter: { name: 'Starter', credits: 5, price: 4999, priceDisplay: '£49.99', firstPrice: 3999, firstPriceDisplay: '£39.99' },
+  professional: { name: 'Professional', credits: 15, price: 12999, priceDisplay: '£129.99', firstPrice: 10399, firstPriceDisplay: '£103.99' },
+  business: { name: 'Business', credits: 30, price: 19999, priceDisplay: '£199.99', firstPrice: 15999, firstPriceDisplay: '£159.99' }
 };
 
 // =====================
@@ -725,7 +726,7 @@ async function register() {
 
     currentUser = data.company;
     localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
-    showToast('Account created! Welcome email sent.');
+    showToast('Account created! You have 5 free credits to start.');
     showApp();
   } catch (err) {
     // Fallback to localStorage
@@ -738,7 +739,8 @@ async function register() {
     const companyData = {
       id: 'comp_' + Date.now(),
       company, name, email, phone, password, postcode, radius,
-      credits: 0,
+      credits: 5, // 5 free credits for new accounts
+      hasPurchased: false, // Track if they've made first purchase
       createdAt: new Date().toISOString(),
       notifyEmail: true,
       notifySMS: false
@@ -749,7 +751,7 @@ async function register() {
 
     currentUser = companyData;
     localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
-    showToast('Account created! (Email not sent - API offline)');
+    showToast('Account created! You have 5 free credits to start. (Offline mode)');
     showApp();
   }
 }
@@ -1009,9 +1011,17 @@ function showPayment(packageId) {
   selectedPackage = CREDIT_PACKAGES[packageId];
   if (!selectedPackage) return;
 
-  document.getElementById('paymentSummary').textContent = 
-    `${selectedPackage.name} Package — ${selectedPackage.credits} credits for ${selectedPackage.priceDisplay}`;
+  // Check if this is their first purchase (20% off)
+  const isFirstPurchase = !currentUser.hasPurchased;
+  const displayPrice = isFirstPurchase ? selectedPackage.firstPriceDisplay : selectedPackage.priceDisplay;
+  const originalPrice = selectedPackage.priceDisplay;
 
+  let summaryText = `${selectedPackage.name} Package — ${selectedPackage.credits} credits for ${displayPrice}`;
+  if (isFirstPurchase) {
+    summaryText += ` <span style="color:var(--success);font-weight:600;">(20% off first purchase!)</span>`;
+  }
+
+  document.getElementById('paymentSummary').innerHTML = summaryText;
   document.getElementById('paymentModal').classList.add('active');
 
   // Initialize Stripe if not already done
@@ -1038,7 +1048,11 @@ async function processPayment() {
   // If Stripe is not configured, fall back to demo mode
   if (!STRIPE_KEY || !STRIPE_KEY.startsWith('pk_')) {
     // Demo mode: add credits immediately
+    const isFirstPurchase = !currentUser.hasPurchased;
+    const amountPaid = isFirstPurchase ? selectedPackage.firstPriceDisplay : selectedPackage.priceDisplay;
+    
     currentUser.credits = (currentUser.credits || 0) + selectedPackage.credits;
+    currentUser.hasPurchased = true;
     
     // Save purchase to localStorage
     const purchases = getPurchases();
@@ -1047,7 +1061,8 @@ async function processPayment() {
       companyId: currentUser.id,
       package: selectedPackage.name,
       credits: selectedPackage.credits,
-      amount: selectedPackage.priceDisplay,
+      amount: amountPaid,
+      isFirstPurchase: isFirstPurchase,
       createdAt: new Date().toISOString()
     });
     savePurchases(purchases);
@@ -1061,13 +1076,17 @@ async function processPayment() {
 
   try {
     const packageId = Object.keys(CREDIT_PACKAGES).find(key => CREDIT_PACKAGES[key].name === selectedPackage.name);
+    const isFirstPurchase = !currentUser.hasPurchased;
+    const amountToCharge = isFirstPurchase ? selectedPackage.firstPrice : selectedPackage.price;
     
     const res = await fetch(`${API_URL}/create-payment-intent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         packageId: packageId,
-        companyId: currentUser.id 
+        companyId: currentUser.id,
+        amount: amountToCharge,
+        isFirstPurchase: isFirstPurchase
       })
     });
 
@@ -1089,16 +1108,20 @@ async function processPayment() {
       // Payment successful - add credits immediately
       paymentSucceeded = true;
       currentUser.credits = (currentUser.credits || 0) + selectedPackage.credits;
+      currentUser.hasPurchased = true; // Mark that they've made first purchase
       updateCurrentUser();
       
       // Save purchase to localStorage for tracking
       const purchases = JSON.parse(localStorage.getItem('hvac_purchases') || '[]');
+      const isFirstPurchase = !currentUser.hasPurchased;
+      const amountPaid = isFirstPurchase ? selectedPackage.firstPriceDisplay : selectedPackage.priceDisplay;
       purchases.push({
         id: 'pur_' + Date.now(),
         companyId: currentUser.id,
         package: selectedPackage.name,
         credits: selectedPackage.credits,
-        amount: selectedPackage.priceDisplay,
+        amount: amountPaid,
+        isFirstPurchase: isFirstPurchase,
         createdAt: new Date().toISOString()
       });
       localStorage.setItem('hvac_purchases', JSON.stringify(purchases));
