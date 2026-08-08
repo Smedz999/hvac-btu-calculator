@@ -1,14 +1,17 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
+const mongoose = require('mongoose');
 require('dotenv').config();
+
+const { Company, Lead, Purchase } = require('./models');
 
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Initialize services (will work when keys are added)
+// Initialize services
 let stripe = null;
 let resend = null;
+let twilio = null;
 
 try {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -30,12 +33,22 @@ try {
   console.log('⚠️ Resend not configured');
 }
 
-// In-memory storage (replace with database for production)
-const db = {
-  companies: [],
-  leads: [],
-  purchases: []
-};
+try {
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+    const twilioClient = require('twilio');
+    twilio = twilioClient(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    console.log('✅ Twilio initialized');
+  }
+} catch (e) {
+  console.log('⚠️ Twilio not configured');
+}
+
+// MongoDB Connection
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/acconnx';
+
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('✅ MongoDB connected'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
 
 app.use(cors());
 app.use(express.json());
@@ -43,158 +56,208 @@ app.use(express.json());
 // =====================
 // HEALTH CHECK
 // =====================
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    stripe: !!stripe,
-    resend: !!resend,
-    companies: db.companies.length,
-    leads: db.leads.length,
-    purchases: db.purchases.length
-  });
+app.get('/api/health', async (req, res) => {
+  try {
+    const companies = await Company.countDocuments();
+    const leads = await Lead.countDocuments();
+    const purchases = await Purchase.countDocuments();
+    
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      stripe: !!stripe,
+      resend: !!resend,
+      twilio: !!twilio,
+      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+      companies,
+      leads,
+      purchases
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // =====================
 // COMPANIES
 // =====================
 app.post('/api/companies/register', async (req, res) => {
-  const { company, name, email, phone, password, postcode, radius } = req.body;
+  try {
+    const { company, name, email, phone, password, postcode, radius } = req.body;
 
-  if (!company || !name || !email || !phone || !password || !postcode) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-
-  const existing = db.companies.find(c => c.email === email);
-  if (existing) {
-    return res.status(409).json({ error: 'Email already registered' });
-  }
-
-  const companyData = {
-    id: 'comp_' + Date.now(),
-    company,
-    name,
-    email,
-    phone,
-    password, // TODO: Hash in production
-    postcode: postcode.toUpperCase(),
-    radius: radius || 25,
-    credits: 0,
-    createdAt: new Date().toISOString(),
-    notifyEmail: true,
-    notifySMS: false
-  };
-
-  db.companies.push(companyData);
-
-  // Send welcome email
-  if (resend) {
-    try {
-      await resend.emails.send({
-        from: 'ACConnx <onboarding@acconnx.com>',
-        to: email,
-        subject: 'Welcome to HVAC Lead Pro!',
-        html: `<h1>Welcome ${name}!</h1><p>Your company ${company} is now registered. Buy credits to start receiving qualified leads.</p><p><a href="https://acconnx.com/company-portal.html">Login to your dashboard</a></p>`
-      });
-    } catch (e) {
-      console.log('Failed to send welcome email:', e.message);
+    if (!company || !name || !email || !phone || !password || !postcode) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
+
+    const existing = await Company.findOne({ email });
+    if (existing) {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+
+    const companyData = new Company({
+      company,
+      name,
+      email,
+      phone,
+      password, // TODO: Hash in production
+      postcode: postcode.toUpperCase(),
+      radius: radius || 25,
+      credits: 5, // 5 free credits
+      hasPurchased: false,
+      notifyEmail: true,
+      notifySMS: false
+    });
+
+    await companyData.save();
+
+    // Send welcome email
+    if (resend) {
+      try {
+        await resend.emails.send({
+          from: 'ACConnx <onboarding@acconnx.com>',
+          to: email,
+          subject: 'Welcome to ACConnx!',
+          html: `<h1>Welcome ${name}!</h1><p>Your company ${company} is now registered with 5 free credits.</p><p><a href="https://acconnx.com/company-portal.html">Login to your dashboard</a></p>`
+        });
+      } catch (e) {
+        console.log('Failed to send welcome email:', e.message);
+      }
+    }
+
+    const companyObj = companyData.toObject();
+    delete companyObj.password;
+    res.json({ success: true, company: companyObj });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  res.json({ success: true, company: { ...companyData, password: undefined } });
 });
 
-app.post('/api/companies/login', (req, res) => {
-  const { email, password } = req.body;
-  const company = db.companies.find(c => c.email === email && c.password === password);
+app.post('/api/companies/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const company = await Company.findOne({ email, password });
 
-  if (!company) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    if (!company) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const companyObj = company.toObject();
+    delete companyObj.password;
+    res.json({ success: true, company: companyObj });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  res.json({ success: true, company: { ...company, password: undefined } });
 });
 
-app.get('/api/companies', (req, res) => {
-  res.json(db.companies.map(c => ({ ...c, password: undefined })));
+app.get('/api/companies', async (req, res) => {
+  try {
+    const companies = await Company.find().select('-password');
+    res.json(companies);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.put('/api/companies/:id', (req, res) => {
-  const idx = db.companies.findIndex(c => c.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Company not found' });
-
-  db.companies[idx] = { ...db.companies[idx], ...req.body };
-  res.json({ success: true, company: { ...db.companies[idx], password: undefined } });
+app.put('/api/companies/:id', async (req, res) => {
+  try {
+    const company = await Company.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body },
+      { new: true }
+    ).select('-password');
+    
+    if (!company) return res.status(404).json({ error: 'Company not found' });
+    res.json({ success: true, company });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // =====================
 // LEADS
 // =====================
 app.post('/api/leads', async (req, res) => {
-  const { customerName, customerEmail, customerPhone, postcode, btu, roomType, propertyType, notes } = req.body;
+  try {
+    const { customerName, customerEmail, customerPhone, postcode, btu, roomType, propertyType, notes } = req.body;
 
-  const lead = {
-    id: 'lead_' + Date.now(),
-    customerName,
-    customerEmail,
-    customerPhone,
-    postcode: postcode?.toUpperCase(),
-    btu,
-    roomType,
-    propertyType,
-    notes,
-    status: 'new',
-    createdAt: new Date().toISOString()
-  };
+    const lead = new Lead({
+      customerName,
+      customerEmail,
+      customerPhone,
+      postcode: postcode?.toUpperCase(),
+      btu,
+      roomType,
+      propertyType,
+      notes,
+      status: 'new'
+    });
 
-  db.leads.push(lead);
+    await lead.save();
 
-  // Auto-distribute to matching companies
-  const distributed = await distributeLead(lead);
+    // Auto-distribute to matching companies
+    const distributed = await distributeLead(lead);
 
-  res.json({ success: true, lead, distributed: distributed || [] });
-});
-
-app.get('/api/leads', (req, res) => {
-  const { companyId } = req.query;
-  let leads = db.leads;
-  if (companyId) {
-    leads = leads.filter(l => l.companyId === companyId);
+    res.json({ success: true, lead, distributed: distributed || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  res.json(leads);
 });
 
-app.put('/api/leads/:id', (req, res) => {
-  const idx = db.leads.findIndex(l => l.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Lead not found' });
+app.get('/api/leads', async (req, res) => {
+  try {
+    const { companyId } = req.query;
+    let query = {};
+    if (companyId) {
+      query.companyId = companyId;
+    }
+    const leads = await Lead.find(query).sort({ createdAt: -1 });
+    res.json(leads);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-  db.leads[idx] = { ...db.leads[idx], ...req.body, statusUpdatedAt: new Date().toISOString() };
-  res.json({ success: true, lead: db.leads[idx] });
+app.put('/api/leads/:id', async (req, res) => {
+  try {
+    const lead = await Lead.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body, statusUpdatedAt: new Date() },
+      { new: true }
+    );
+    
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+    res.json({ success: true, lead });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // =====================
 // STRIPE PAYMENTS
 // =====================
+const CREDIT_PACKAGES = {
+  starter: { name: 'Starter', credits: 5, price: 4999, firstPrice: 3999 },
+  professional: { name: 'Professional', credits: 15, price: 12999, firstPrice: 10399 },
+  business: { name: 'Business', credits: 30, price: 19999, firstPrice: 15999 }
+};
+
 app.post('/api/create-payment-intent', async (req, res) => {
   if (!stripe) {
-    return res.status(503).json({ error: 'Stripe not configured. Add STRIPE_SECRET_KEY to environment variables.' });
+    return res.status(503).json({ error: 'Stripe not configured' });
   }
 
-  const { packageId, companyId } = req.body;
-  const packages = {
-    starter: { amount: 2500, credits: 5 },
-    professional: { amount: 6000, credits: 15 },
-    business: { amount: 10000, credits: 30 }
-  };
-
-  const pkg = packages[packageId];
-  if (!pkg) return res.status(400).json({ error: 'Invalid package' });
-
   try {
+    const { packageId, companyId, isFirstPurchase } = req.body;
+    const pkg = CREDIT_PACKAGES[packageId];
+    
+    if (!pkg) return res.status(400).json({ error: 'Invalid package' });
+
+    const amount = isFirstPurchase ? pkg.firstPrice : pkg.price;
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: pkg.amount,
+      amount,
       currency: 'gbp',
-      metadata: { packageId, companyId, credits: pkg.credits }
+      metadata: { packageId, companyId, credits: pkg.credits, isFirstPurchase: isFirstPurchase ? 'true' : 'false' }
     });
 
     res.json({ clientSecret: paymentIntent.client_secret });
@@ -204,132 +267,164 @@ app.post('/api/create-payment-intent', async (req, res) => {
 });
 
 app.post('/api/confirm-payment', async (req, res) => {
-  const { companyId, packageId, credits, amount } = req.body;
+  try {
+    const { companyId, packageId, credits, amount, isFirstPurchase } = req.body;
 
-  const company = db.companies.find(c => c.id === companyId);
-  if (!company) return res.status(404).json({ error: 'Company not found' });
+    const company = await Company.findById(companyId);
+    if (!company) return res.status(404).json({ error: 'Company not found' });
 
-  company.credits = (company.credits || 0) + credits;
+    company.credits = (company.credits || 0) + credits;
+    company.hasPurchased = true;
+    await company.save();
 
-  const purchase = {
-    id: 'pur_' + Date.now(),
-    companyId,
-    package: packageId,
-    credits,
-    amount: '£' + (amount / 100),
-    createdAt: new Date().toISOString()
-  };
+    const purchase = new Purchase({
+      companyId,
+      package: packageId,
+      credits,
+      amount: '£' + (amount / 100).toFixed(2),
+      isFirstPurchase: isFirstPurchase || false
+    });
 
-  db.purchases.push(purchase);
+    await purchase.save();
 
-  // Send receipt email
-  if (resend) {
-    try {
-      await resend.emails.send({
-        from: 'ACConnx <receipts@acconnx.com>',
-        to: company.email,
-        subject: 'Payment Confirmation - HVAC Lead Pro',
-        html: `<h1>Thank you for your purchase!</h1><p>You bought ${credits} credits for £${amount / 100}.</p><p>Your new balance: ${company.credits} credits</p><p><a href="https://acconnx.com/company-portal.html">View Dashboard</a></p>`
-      });
-    } catch (e) {
-      console.log('Failed to send receipt:', e.message);
+    // Send receipt email
+    if (resend) {
+      try {
+        await resend.emails.send({
+          from: 'ACConnx <receipts@acconnx.com>',
+          to: company.email,
+          subject: 'Payment Confirmation - ACConnx',
+          html: `<h1>Thank you for your purchase!</h1><p>You bought ${credits} credits for £${(amount / 100).toFixed(2)}.</p><p>Your new balance: ${company.credits} credits</p><p><a href="https://acconnx.com/company-portal.html">View Dashboard</a></p>`
+        });
+      } catch (e) {
+        console.log('Failed to send receipt:', e.message);
+      }
     }
-  }
 
-  res.json({ success: true, company: { ...company, password: undefined }, purchase });
+    const companyObj = company.toObject();
+    delete companyObj.password;
+    res.json({ success: true, company: companyObj, purchase });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // =====================
 // ADMIN STATS
 // =====================
-app.get('/api/admin/stats', (req, res) => {
-  const totalRevenue = db.purchases.reduce((sum, p) => {
-    const amount = parseInt(p.amount?.replace(/[^0-9]/g, '') || 0);
-    return sum + amount;
-  }, 0);
+app.get('/api/admin/stats', async (req, res) => {
+  try {
+    const purchases = await Purchase.find();
+    const totalRevenue = purchases.reduce((sum, p) => {
+      const amount = parseFloat(p.amount?.replace(/[^0-9.]/g, '') || 0);
+      return sum + amount;
+    }, 0);
 
-  const distributedLeads = db.leads.filter(l => l.companyId);
-  const originalLeads = db.leads.filter(l => !l.companyId);
-  const wonLeads = db.leads.filter(l => l.status === 'won');
+    const totalCompanies = await Company.countDocuments();
+    const totalLeads = await Lead.countDocuments({ companyId: { $exists: false } });
+    const distributedLeads = await Lead.countDocuments({ companyId: { $exists: true } });
+    const wonLeads = await Lead.countDocuments({ status: 'won' });
 
-  res.json({
-    totalRevenue,
-    totalCompanies: db.companies.length,
-    totalLeads: originalLeads.length,
-    distributedLeads: distributedLeads.length,
-    totalCredits: db.purchases.reduce((sum, p) => sum + (p.credits || 0), 0),
-    conversionRate: distributedLeads.length > 0 ? Math.round((wonLeads.length / distributedLeads.length) * 100) : 0,
-    undistributed: originalLeads.filter(l => !distributedLeads.some(dl => dl.originalLeadId === l.id)).length
-  });
+    res.json({
+      totalRevenue: totalRevenue.toFixed(2),
+      totalCompanies,
+      totalLeads,
+      distributedLeads,
+      totalCredits: purchases.reduce((sum, p) => sum + (p.credits || 0), 0),
+      conversionRate: distributedLeads > 0 ? Math.round((wonLeads / distributedLeads) * 100) : 0
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // =====================
 // LEAD DISTRIBUTION
 // =====================
 async function distributeLead(lead) {
-  const leadPrefix = lead.postcode?.split(' ')[0];
-  if (!leadPrefix) return [];
+  try {
+    const leadPrefix = lead.postcode?.split(' ')[0];
+    if (!leadPrefix) return [];
 
-  const eligible = db.companies.filter(comp => {
-    if ((comp.credits || 0) <= 0) return false;
-    const compPrefix = comp.postcode?.split(' ')[0];
-    return compPrefix === leadPrefix || comp.postcode?.startsWith(leadPrefix.substring(0, 2));
-  });
+    // Find eligible companies (have credits, matching postcode area)
+    const eligible = await Company.find({
+      credits: { $gt: 0 },
+      $or: [
+        { postcode: { $regex: `^${leadPrefix}`, $options: 'i' } },
+        { postcode: { $regex: `^${leadPrefix.substring(0, 2)}`, $options: 'i' } }
+      ]
+    }).sort({ credits: -1 }).limit(3);
 
-  eligible.sort((a, b) => (b.credits || 0) - (a.credits || 0));
-  const selected = eligible.slice(0, 3);
+    for (const company of eligible) {
+      company.credits = (company.credits || 0) - 1;
+      await company.save();
 
-  for (const company of selected) {
-    company.credits = (company.credits || 0) - 1;
+      const companyLead = new Lead({
+        ...lead.toObject(),
+        _id: undefined,
+        originalLeadId: lead._id,
+        companyId: company._id,
+        status: 'new',
+        assignedAt: new Date()
+      });
 
-    const companyLead = {
-      ...lead,
-      id: lead.id + '_comp' + company.id,
-      originalLeadId: lead.id,
-      companyId: company.id,
-      status: 'new',
-      assignedAt: new Date().toISOString()
-    };
+      await companyLead.save();
 
-    db.leads.push(companyLead);
+      // Send SMS notification
+      if (twilio && company.notifySMS === true && company.phone) {
+        try {
+          await twilio.messages.create({
+            body: `🔥 ACConnx Lead: ${lead.customerName} in ${lead.postcode}. ${lead.btu ? lead.btu.toLocaleString() + ' BTU' : 'BTU TBD'}. Login: acconnx.com/company-portal.html`,
+            to: company.phone,
+            from: process.env.TWILIO_PHONE_NUMBER || 'ACConnx'
+          });
+        } catch (e) {
+          console.log('Failed to send SMS:', e.message);
+        }
+      }
 
-    // Send email notification
-    if (resend && company.notifyEmail !== false) {
-      try {
-        await resend.emails.send({
-          from: 'ACConnx <leads@acconnx.com>',
-          to: company.email,
-          subject: '🔥 New Lead: ' + lead.customerName + ' - ' + lead.postcode,
-          html: `<h1>New Lead Alert!</h1>
-            <p><strong>Customer:</strong> ${lead.customerName}</p>
-            <p><strong>Email:</strong> ${lead.customerEmail}</p>
-            <p><strong>Phone:</strong> ${lead.customerPhone || 'Not provided'}</p>
-            <p><strong>Postcode:</strong> ${lead.postcode}</p>
-            <p><strong>BTU Required:</strong> ${lead.btu?.toLocaleString() || 'Not calculated'}</p>
-            <p><strong>Room Type:</strong> ${lead.roomType || 'Not specified'}</p>
-            <p><a href="https://acconnx.com/company-portal.html">View in Dashboard</a></p>
-            <p><em>Contact within 15 minutes for best results!</em></p>`
-        });
-      } catch (e) {
-        console.log('Failed to send lead notification:', e.message);
+      // Send email notification
+      if (resend && company.notifyEmail !== false) {
+        try {
+          await resend.emails.send({
+            from: 'ACConnx <leads@acconnx.com>',
+            to: company.email,
+            subject: '🔥 New Lead: ' + lead.customerName + ' - ' + lead.postcode,
+            html: `<h1>New Lead Alert!</h1>
+              <p><strong>Customer:</strong> ${lead.customerName}</p>
+              <p><strong>Email:</strong> ${lead.customerEmail}</p>
+              <p><strong>Phone:</strong> ${lead.customerPhone || 'Not provided'}</p>
+              <p><strong>Postcode:</strong> ${lead.postcode}</p>
+              <p><strong>BTU Required:</strong> ${lead.btu?.toLocaleString() || 'Not calculated'}</p>
+              <p><strong>Room Type:</strong> ${lead.roomType || 'Not specified'}</p>
+              <p><a href="https://acconnx.com/company-portal.html">View in Dashboard</a></p>
+              <p><em>Contact within 15 minutes for best results!</em></p>`
+          });
+        } catch (e) {
+          console.log('Failed to send lead notification:', e.message);
+        }
       }
     }
-  }
 
-  return selected.map(c => c.company);
+    return eligible.map(c => c.company);
+  } catch (err) {
+    console.error('Lead distribution error:', err);
+    return [];
+  }
 }
 
 // =====================
-// START SERVER (for local dev)
+// START SERVER
 // =====================
 if (process.env.NODE_ENV !== 'production') {
   app.listen(port, () => {
     console.log(`🚀 ACConnx API running on port ${port}`);
     console.log(`📊 Health check: http://localhost:${port}/api/health`);
-    console.log(`💳 Stripe: ${stripe ? '✅ Connected' : '⚠️ Not configured (add STRIPE_SECRET_KEY)'}`);
-    console.log(`📧 Resend: ${resend ? '✅ Connected' : '⚠️ Not configured (add RESEND_API_KEY)'}`);
+    console.log(`💳 Stripe: ${stripe ? '✅ Connected' : '⚠️ Not configured'}`);
+    console.log(`📧 Resend: ${resend ? '✅ Connected' : '⚠️ Not configured'}`);
+    console.log(`📱 Twilio: ${twilio ? '✅ Connected' : '⚠️ Not configured'}`);
+    console.log(`🗄️  MongoDB: ${mongoose.connection.readyState === 1 ? '✅ Connected' : '⚠️ Not configured'}`);
   });
 }
 
-// Export for Vercel serverless
 module.exports = app;
