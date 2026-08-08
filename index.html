@@ -540,8 +540,19 @@
         </div>
 
         <div class="form-group">
-          <label>Floor Area <span class="hint" id="areaHint">(e.g. 20 for 20m²)</span></label>
-          <input type="number" id="floorArea" placeholder="20" min="1" step="0.1">
+          <label>Room Length <span class="hint" id="lengthHint">(metres)</span></label>
+          <input type="number" id="roomLength" placeholder="e.g. 5" min="0.1" step="0.1" oninput="calculateArea()">
+        </div>
+
+        <div class="form-group">
+          <label>Room Width <span class="hint" id="widthHint">(metres)</span></label>
+          <input type="number" id="roomWidth" placeholder="e.g. 4" min="0.1" step="0.1" oninput="calculateArea()">
+        </div>
+
+        <div class="form-group" style="background: var(--bg); padding: 1rem; border-radius: var(--radius); border: 1px solid var(--border);">
+          <label style="margin-bottom: 0.25rem;">Calculated Floor Area</label>
+          <div id="calculatedArea" style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">— m²</div>
+          <input type="hidden" id="floorArea">
         </div>
 
         <div class="row">
@@ -612,6 +623,7 @@
         <div class="explanation">
           <h3>How it works</h3>
           <ul>
+            <li>Enter room length and width — floor area is calculated automatically</li>
             <li>Base load calculated from floor area using industry-standard BTU/m² values</li>
             <li>Ceiling height adjusts for total air volume</li>
             <li>Insulation, sun exposure, and room type apply heat gain modifiers</li>
@@ -709,14 +721,39 @@
       currentUnit = unit;
       document.getElementById('btnMetric').classList.toggle('active', unit === 'metric');
       document.getElementById('btnImperial').classList.toggle('active', unit === 'imperial');
-      document.getElementById('areaHint').textContent = unit === 'metric' ? '(e.g. 20 for 20m²)' : '(e.g. 200 for 200ft²)';
+      document.getElementById('lengthHint').textContent = unit === 'metric' ? '(metres)' : '(feet)';
+      document.getElementById('widthHint').textContent = unit === 'metric' ? '(metres)' : '(feet)';
       document.getElementById('heightHint').textContent = unit === 'metric' ? '(m)' : '(ft)';
-      document.getElementById('floorArea').placeholder = unit === 'metric' ? '20' : '200';
+      document.getElementById('roomLength').placeholder = unit === 'metric' ? 'e.g. 5' : 'e.g. 16';
+      document.getElementById('roomWidth').placeholder = unit === 'metric' ? 'e.g. 4' : 'e.g. 13';
       document.getElementById('ceilingHeight').placeholder = unit === 'metric' ? '2.5' : '8';
+      calculateArea(); // Recalculate when unit changes
+    }
+
+    function calculateArea() {
+      const length = parseFloat(document.getElementById('roomLength').value);
+      const width = parseFloat(document.getElementById('roomWidth').value);
+      const areaDisplay = document.getElementById('calculatedArea');
+      const floorAreaInput = document.getElementById('floorArea');
+      
+      if (length > 0 && width > 0) {
+        const area = length * width;
+        const unitLabel = currentUnit === 'metric' ? 'm²' : 'ft²';
+        areaDisplay.textContent = area.toFixed(1) + ' ' + unitLabel;
+        floorAreaInput.value = area;
+        areaDisplay.style.color = 'var(--primary)';
+      } else {
+        const unitLabel = currentUnit === 'metric' ? 'm²' : 'ft²';
+        areaDisplay.textContent = '— ' + unitLabel;
+        floorAreaInput.value = '';
+        areaDisplay.style.color = 'var(--text-muted)';
+      }
     }
 
     function calculate() {
       const floorArea = parseFloat(document.getElementById('floorArea').value);
+      const roomLength = parseFloat(document.getElementById('roomLength').value);
+      const roomWidth = parseFloat(document.getElementById('roomWidth').value);
       const ceilingHeight = parseFloat(document.getElementById('ceilingHeight').value) || (currentUnit === 'metric' ? 2.5 : 8);
       const occupants = parseInt(document.getElementById('occupants').value) || 2;
       const roomType = document.getElementById('roomType').value;
@@ -724,12 +761,27 @@
       const insulation = document.getElementById('insulation').value;
       const climate = document.getElementById('climate').value;
 
-      if (!floorArea || floorArea <= 0) {
-        showToast('Please enter a valid floor area');
-        document.getElementById('floorArea').classList.add('error');
+      // Validation with clear error messages
+      if (!roomLength || roomLength <= 0) {
+        showToast('Please enter the room length');
+        document.getElementById('roomLength').classList.add('error');
+        document.getElementById('roomLength').focus();
         return;
       }
-      document.getElementById('floorArea').classList.remove('error');
+      document.getElementById('roomLength').classList.remove('error');
+
+      if (!roomWidth || roomWidth <= 0) {
+        showToast('Please enter the room width');
+        document.getElementById('roomWidth').classList.add('error');
+        document.getElementById('roomWidth').focus();
+        return;
+      }
+      document.getElementById('roomWidth').classList.remove('error');
+
+      if (!floorArea || floorArea <= 0) {
+        showToast('Please enter valid room dimensions');
+        return;
+      }
 
       // Base BTU per unit area
       const baseBtuPerArea = currentUnit === 'metric' ? 500 : 50;
