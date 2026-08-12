@@ -404,54 +404,60 @@
 
 <script>
 // =====================
-// DATA ACCESS
+// API CONFIG
 // =====================
-function getCompanies() {
-  return JSON.parse(localStorage.getItem('hvac_companies') || '[]');
+const API_BASE = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3001/api' 
+  : 'https://acconnx.com/api';
+
+// =====================
+// DATA ACCESS — API
+// =====================
+async function fetchAPI(endpoint, options = {}) {
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('API fetch failed:', err);
+    showToast('Failed to load data. Check API connection.', 'error');
+    return null;
+  }
 }
 
-function getLeads() {
-  return JSON.parse(localStorage.getItem('hvac_leads') || '[]');
+async function getCompanies() {
+  return await fetchAPI('/companies') || [];
 }
 
-function getPurchases() {
-  return JSON.parse(localStorage.getItem('hvac_purchases') || '[]');
+async function getLeads() {
+  return await fetchAPI('/leads') || [];
+}
+
+async function getPurchases() {
+  // Note: purchases endpoint not in API yet, using admin stats
+  return [];
+}
+
+async function getAdminStats() {
+  return await fetchAPI('/admin/stats') || {};
 }
 
 // =====================
 // STATS
 // =====================
-function loadStats() {
-  const companies = getCompanies();
-  const leads = getLeads();
-  const purchases = getPurchases();
-
-  const distributedLeads = leads.filter(l => l.companyId);
-  const originalLeads = leads.filter(l => !l.companyId);
-  const undistributed = originalLeads.filter(l => {
-    const assigned = leads.filter(dl => dl.originalLeadId === l.id);
-    return assigned.length === 0;
-  });
-
-  const totalCredits = purchases.reduce((sum, p) => sum + (p.credits || 0), 0);
-  const totalRevenue = purchases.reduce((sum, p) => {
-    const amount = parseInt(p.amount?.replace(/[^0-9]/g, '') || 0);
-    return sum + amount;
-  }, 0);
-
-  const wonLeads = leads.filter(l => l.status === 'won' && l.companyId);
-  const companyLeads = leads.filter(l => l.companyId);
-  const conversionRate = companyLeads.length > 0
-    ? Math.round((wonLeads.length / companyLeads.length) * 100)
-    : 0;
-
-  document.getElementById('statCompanies').textContent = companies.length;
-  document.getElementById('statLeads').textContent = originalLeads.length;
-  document.getElementById('statDistributed').textContent = distributedLeads.length;
-  document.getElementById('statCredits').textContent = totalCredits;
-  document.getElementById('statConversion').textContent = conversionRate + '%';
-  document.getElementById('statPending').textContent = undistributed.length;
-  document.getElementById('totalRevenue').textContent = '£' + totalRevenue;
+async function loadStats() {
+  const stats = await getAdminStats();
+  
+  document.getElementById('statCompanies').textContent = stats.totalCompanies || 0;
+  document.getElementById('statLeads').textContent = stats.totalLeads || 0;
+  document.getElementById('statDistributed').textContent = stats.distributedLeads || 0;
+  document.getElementById('statCredits').textContent = stats.totalCredits || 0;
+  document.getElementById('statConversion').textContent = (stats.conversionRate || 0) + '%';
+  document.getElementById('statPending').textContent = (stats.totalLeads - stats.distributedLeads) || 0;
+  document.getElementById('totalRevenue').textContent = '£' + (stats.totalRevenue || '0');
 }
 
 // =====================
@@ -473,10 +479,10 @@ function showTab(tab) {
 // =====================
 // RENDER LEADS
 // =====================
-function renderLeads() {
+async function renderLeads() {
   const search = document.getElementById('leadSearch').value.toLowerCase();
-  const leads = getLeads();
-  const companies = getCompanies();
+  const leads = await getLeads();
+  const companies = await getCompanies();
 
   let filtered = leads;
   if (search) {
@@ -498,7 +504,7 @@ function renderLeads() {
 
   empty.style.display = 'none';
   tbody.innerHTML = filtered.slice().reverse().map(lead => {
-    const company = companies.find(c => c.id === lead.companyId);
+    const company = companies.find(c => c._id === lead.companyId);
     return `
       <tr>
         <td>${formatDate(lead.createdAt)}</td>
@@ -518,10 +524,10 @@ function renderLeads() {
 // =====================
 // RENDER COMPANIES
 // =====================
-function renderCompanies() {
+async function renderCompanies() {
   const search = document.getElementById('companySearch').value.toLowerCase();
-  const companies = getCompanies();
-  const leads = getLeads();
+  const companies = await getCompanies();
+  const leads = await getLeads();
 
   let filtered = companies;
   if (search) {
@@ -543,7 +549,7 @@ function renderCompanies() {
 
   empty.style.display = 'none';
   tbody.innerHTML = filtered.map(company => {
-    const companyLeads = leads.filter(l => l.companyId === company.id);
+    const companyLeads = leads.filter(l => l.companyId === company._id);
     return `
       <tr>
         <td><strong>${company.company}</strong></td>
@@ -562,9 +568,9 @@ function renderCompanies() {
 // =====================
 // RENDER PURCHASES
 // =====================
-function renderPurchases() {
-  const purchases = getPurchases();
-  const companies = getCompanies();
+async function renderPurchases() {
+  const purchases = await getPurchases();
+  const companies = await getCompanies();
   const tbody = document.getElementById('purchasesTable');
   const empty = document.getElementById('purchasesEmpty');
 
@@ -576,7 +582,7 @@ function renderPurchases() {
 
   empty.style.display = 'none';
   tbody.innerHTML = purchases.slice().reverse().map(p => {
-    const company = companies.find(c => c.id === p.companyId);
+    const company = companies.find(c => c._id === p.companyId);
     return `
       <tr>
         <td>${formatDate(p.createdAt)}</td>
@@ -592,9 +598,9 @@ function renderPurchases() {
 // =====================
 // RENDER ANALYTICS
 // =====================
-function renderAnalytics() {
-  const leads = getLeads().filter(l => l.companyId);
-  const companies = getCompanies();
+async function renderAnalytics() {
+  const leads = (await getLeads()).filter(l => l.companyId);
+  const companies = await getCompanies();
 
   // Status breakdown
   const statuses = {};
@@ -647,7 +653,7 @@ function renderAnalytics() {
   document.getElementById('topCompanies').innerHTML = topHtml;
 
   // Activity log
-  const allLeads = getLeads().slice().reverse().slice(0, 10);
+  const allLeads = (await getLeads()).slice().reverse().slice(0, 10);
   let activityHtml = '<div style="display:flex;flex-direction:column;gap:0.5rem;">';
   allLeads.forEach(l => {
     const company = companies.find(c => c.id === l.companyId);
@@ -683,9 +689,9 @@ function showToast(message, type) {
 // =====================
 // INIT
 // =====================
-function init() {
-  loadStats();
-  renderLeads();
+async function init() {
+  await loadStats();
+  await renderLeads();
 }
 
 init();
