@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const { Company, Lead, Purchase } = require('./models');
@@ -94,12 +95,15 @@ app.post('/api/companies/register', async (req, res) => {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
+    // Hash password before saving
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
     const companyData = new Company({
       company,
       name,
       email,
       phone,
-      password, // TODO: Hash in production
+      password: hashedPassword,
       postcode: postcode.toUpperCase(),
       radius: radius || 25,
       credits: 5, // 5 free credits
@@ -135,9 +139,15 @@ app.post('/api/companies/register', async (req, res) => {
 app.post('/api/companies/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const company = await Company.findOne({ email, password });
+    const company = await Company.findOne({ email });
 
     if (!company) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Compare hashed password
+    const isMatch = await bcrypt.compare(password, company.password);
+    if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
