@@ -45,8 +45,34 @@ const purchaseSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+// Prospect Schema (CRM)
+const prospectSchema = new mongoose.Schema({
+  company: { type: String, required: true },
+  name: { type: String, required: true },
+  email: { type: String, required: true },
+  phone: String,
+  city: String,
+  postcode: String,
+  status: { type: String, default: 'new', enum: ['new', 'contacted', 'interested', 'registered', 'customer'] },
+  notes: String,
+  lastContact: Date,
+  createdAt: { type: Date, default: Date.now }
+});
+
+// Task Schema (CRM)
+const taskSchema = new mongoose.Schema({
+  prospectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Prospect' },
+  company: String,
+  text: { type: String, required: true },
+  dueDate: Date,
+  completed: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
+
 module.exports = {
   Company: mongoose.model('Company', companySchema),
   Lead: mongoose.model('Lead', leadSchema),
-  Purchase: mongoose.model('Purchase', purchaseSchema)
+  Purchase: mongoose.model('Purchase', purchaseSchema),
+  Prospect: mongoose.model('Prospect', prospectSchema),
+  Task: mongoose.model('Task', taskSchema)
 };

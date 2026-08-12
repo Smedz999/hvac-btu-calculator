@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
-const { Company, Lead, Purchase } = require('./models');
+const { Company, Lead, Purchase, Prospect, Task } = require('./models');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -422,6 +422,128 @@ async function distributeLead(lead) {
     return [];
   }
 }
+
+// =====================
+// CRM — PROSPECTS
+// =====================
+app.get('/api/prospects', async (req, res) => {
+  try {
+    const prospects = await Prospect.find().sort({ createdAt: -1 });
+    res.json(prospects);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/prospects', async (req, res) => {
+  try {
+    const { company, name, email, phone, city, postcode, status, notes } = req.body;
+    
+    if (!company || !name || !email) {
+      return res.status(400).json({ error: 'Company, name, and email are required' });
+    }
+
+    const prospect = new Prospect({
+      company,
+      name,
+      email,
+      phone,
+      city,
+      postcode,
+      status: status || 'new',
+      notes
+    });
+
+    await prospect.save();
+    res.json({ success: true, prospect });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/prospects/:id', async (req, res) => {
+  try {
+    const prospect = await Prospect.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body, lastContact: new Date() },
+      { new: true }
+    );
+    
+    if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+    res.json({ success: true, prospect });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/prospects/:id', async (req, res) => {
+  try {
+    const prospect = await Prospect.findByIdAndDelete(req.params.id);
+    if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =====================
+// CRM — TASKS
+// =====================
+app.get('/api/tasks', async (req, res) => {
+  try {
+    const tasks = await Task.find().sort({ dueDate: 1 });
+    res.json(tasks);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/tasks', async (req, res) => {
+  try {
+    const { prospectId, company, text, dueDate } = req.body;
+    
+    if (!text) {
+      return res.status(400).json({ error: 'Task text is required' });
+    }
+
+    const task = new Task({
+      prospectId,
+      company,
+      text,
+      dueDate: dueDate || new Date(Date.now() + 86400000 * 3) // 3 days default
+    });
+
+    await task.save();
+    res.json({ success: true, task });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/tasks/:id', async (req, res) => {
+  try {
+    const task = await Task.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body },
+      { new: true }
+    );
+    
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    res.json({ success: true, task });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/tasks/:id', async (req, res) => {
+  try {
+    const task = await Task.findByIdAndDelete(req.params.id);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // =====================
 // START SERVER
