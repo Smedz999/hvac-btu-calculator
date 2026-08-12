@@ -428,32 +428,79 @@
 
 <script>
 // =====================
-// DATA
+// API CONFIG
 // =====================
-const STORAGE_KEY = 'hvac_crm_prospects';
-const TASKS_KEY = 'hvac_crm_tasks';
+const API_BASE = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3001/api' 
+  : 'https://acconnx.com/api';
 
-function getProspects() {
-  return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+// =====================
+// DATA — API
+// =====================
+async function fetchAPI(endpoint, options = {}) {
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('API fetch failed:', err);
+    showToast('Failed to load data. Check API connection.', 'error');
+    return null;
+  }
 }
 
-function saveProspects(prospects) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(prospects));
+async function getProspects() {
+  return await fetchAPI('/prospects') || [];
 }
 
-function getTasks() {
-  return JSON.parse(localStorage.getItem(TASKS_KEY) || '[]');
+async function saveProspect(prospectData) {
+  return await fetchAPI('/prospects', {
+    method: 'POST',
+    body: JSON.stringify(prospectData)
+  });
 }
 
-function saveTasks(tasks) {
-  localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+async function updateProspect(id, updates) {
+  return await fetchAPI(`/prospects/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates)
+  });
+}
+
+async function deleteProspect(id) {
+  return await fetchAPI(`/prospects/${id}`, { method: 'DELETE' });
+}
+
+async function getTasks() {
+  return await fetchAPI('/tasks') || [];
+}
+
+async function saveTask(taskData) {
+  return await fetchAPI('/tasks', {
+    method: 'POST',
+    body: JSON.stringify(taskData)
+  });
+}
+
+async function updateTask(id, updates) {
+  return await fetchAPI(`/tasks/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates)
+  });
+}
+
+async function deleteTask(id) {
+  return await fetchAPI(`/tasks/${id}`, { method: 'DELETE' });
 }
 
 // =====================
 // STATS
 // =====================
-function updateStats() {
-  const prospects = getProspects();
+async function updateStats() {
+  const prospects = await getProspects();
   document.getElementById('statTotal').textContent = prospects.length;
   document.getElementById('statContacted').textContent = prospects.filter(p => p.status !== 'new').length;
   document.getElementById('statInterested').textContent = prospects.filter(p => ['interested', 'registered', 'customer'].includes(p.status)).length;
@@ -478,32 +525,32 @@ function showTab(tab) {
 // =====================
 // PROSPECTS
 // =====================
-function renderProspects() {
+async function renderProspects() {
   const search = document.getElementById('prospectSearch').value.toLowerCase();
-  let prospects = getProspects();
+  let prospects = await getProspects();
 
   if (search) {
     prospects = prospects.filter(p =>
       p.company.toLowerCase().includes(search) ||
       p.name.toLowerCase().includes(search) ||
       p.email.toLowerCase().includes(search) ||
-      p.city.toLowerCase().includes(search)
+      (p.city && p.city.toLowerCase().includes(search))
     );
   }
 
   const tbody = document.getElementById('prospectsTable');
-  tbody.innerHTML = prospects.slice().reverse().map(p => `
+  tbody.innerHTML = prospects.map(p => `
     <tr>
       <td><strong>${p.company}</strong></td>
       <td>${p.name}</td>
       <td><a href="mailto:${p.email}">${p.email}</a></td>
       <td>${p.phone || '—'}</td>
-      <td>${p.city}</td>
+      <td>${p.city || '—'}</td>
       <td><span class="badge badge-${p.status}">${p.status}</span></td>
       <td>${p.lastContact ? formatDate(p.lastContact) : 'Never'}</td>
       <td>
-        <button class="btn btn-sm btn-primary" onclick="editStatus('${p.id}')">Update</button>
-        <button class="btn btn-sm" onclick="addFollowUpTask('${p.id}')">Task</button>
+        <button class="btn btn-sm btn-primary" onclick="editStatus('${p._id}')">Update</button>
+        <button class="btn btn-sm" onclick="addFollowUpTask('${p._id}')">Task</button>
       </td>
     </tr>
   `).join('');
@@ -526,9 +573,8 @@ function closeAddModal() {
   document.getElementById('addNotes').value = '';
 }
 
-function saveProspect() {
+async function saveProspect() {
   const prospect = {
-    id: 'prospect_' + Date.now(),
     company: document.getElementById('addCompany').value.trim(),
     name: document.getElementById('addName').value.trim(),
     email: document.getElementById('addEmail').value.trim(),
@@ -536,9 +582,7 @@ function saveProspect() {
     city: document.getElementById('addCity').value.trim(),
     postcode: document.getElementById('addPostcode').value.trim(),
     status: document.getElementById('addStatus').value,
-    notes: document.getElementById('addNotes').value.trim(),
-    createdAt: new Date().toISOString(),
-    lastContact: null
+    notes: document.getElementById('addNotes').value.trim()
   };
 
   if (!prospect.company || !prospect.email) {
@@ -546,58 +590,54 @@ function saveProspect() {
     return;
   }
 
-  const prospects = getProspects();
-  prospects.push(prospect);
-  saveProspects(prospects);
-
-  closeAddModal();
-  renderProspects();
-  showToast('Prospect added');
+  const result = await saveProspect(prospect);
+  if (result) {
+    closeAddModal();
+    renderProspects();
+    showToast('Prospect added');
+  }
 }
 
-function editStatus(id) {
-  const prospects = getProspects();
-  const p = prospects.find(x => x.id === id);
+async function editStatus(id) {
+  const prospects = await getProspects();
+  const p = prospects.find(x => x._id === id);
   if (!p) return;
 
   const newStatus = prompt(`Update status for ${p.company}:\n\nnew, contacted, interested, registered, customer`, p.status);
   if (!newStatus) return;
 
-  p.status = newStatus;
-  p.lastContact = new Date().toISOString();
-  saveProspects(prospects);
-  renderProspects();
-  showToast('Status updated');
+  const result = await updateProspect(id, { status: newStatus });
+  if (result) {
+    renderProspects();
+    showToast('Status updated');
+  }
 }
 
-function addFollowUpTask(prospectId) {
-  const prospects = getProspects();
-  const p = prospects.find(x => x.id === prospectId);
+async function addFollowUpTask(prospectId) {
+  const prospects = await getProspects();
+  const p = prospects.find(x => x._id === prospectId);
   if (!p) return;
 
   const taskText = prompt(`Follow-up task for ${p.company}:`);
   if (!taskText) return;
 
-  const tasks = getTasks();
-  tasks.push({
-    id: 'task_' + Date.now(),
+  const result = await saveTask({
     prospectId,
     company: p.company,
     text: taskText,
-    dueDate: new Date(Date.now() + 86400000 * 3).toISOString(), // 3 days
-    completed: false,
-    createdAt: new Date().toISOString()
+    dueDate: new Date(Date.now() + 86400000 * 3).toISOString()
   });
 
-  saveTasks(tasks);
-  showToast('Task added');
+  if (result) {
+    showToast('Task added');
+  }
 }
 
 // =====================
 // PIPELINE
 // =====================
-function renderPipeline() {
-  const prospects = getProspects();
+async function renderPipeline() {
+  const prospects = await getProspects();
   const statuses = ['new', 'contacted', 'interested', 'registered', 'customer'];
 
   statuses.forEach(status => {
@@ -607,7 +647,7 @@ function renderPipeline() {
     container.innerHTML = filtered.map(p => `
       <div style="background:white;padding:0.75rem;border-radius:6px;margin-bottom:0.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
         <strong style="font-size:0.85rem;">${p.company}</strong>
-        <div style="font-size:0.75rem;color:var(--text-light);">${p.city} • ${p.name}</div>
+        <div style="font-size:0.75rem;color:var(--text-light);">${p.city || ''} • ${p.name}</div>
       </div>
     `).join('') || '<div style="color:var(--text-light);font-size:0.85rem;text-align:center;padding:1rem;">None</div>';
   });
@@ -616,8 +656,8 @@ function renderPipeline() {
 // =====================
 // TASKS
 // =====================
-function renderTasks() {
-  const tasks = getTasks().filter(t => !t.completed);
+async function renderTasks() {
+  const tasks = (await getTasks()).filter(t => !t.completed);
   const container = document.getElementById('tasksList');
 
   if (tasks.length === 0) {
@@ -628,42 +668,35 @@ function renderTasks() {
   container.innerHTML = tasks.map(t => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem;background:var(--bg);border-radius:8px;margin-bottom:0.5rem;">
       <div>
-        <strong>${t.company}</strong> — ${t.text}
+        <strong>${t.company || 'General'}</strong> — ${t.text}
         <div style="font-size:0.8rem;color:var(--text-light);">Due: ${formatDate(t.dueDate)}</div>
       </div>
-      <button class="btn btn-sm btn-success" onclick="completeTask('${t.id}')">Done</button>
+      <button class="btn btn-sm btn-success" onclick="completeTask('${t._id}')">Done</button>
     </div>
   `).join('');
 }
 
-function addTask() {
+async function addTask() {
   const company = prompt('Company name:');
   if (!company) return;
   const text = prompt('Task:');
   if (!text) return;
 
-  const tasks = getTasks();
-  tasks.push({
-    id: 'task_' + Date.now(),
-    prospectId: null,
+  const result = await saveTask({
     company,
     text,
-    dueDate: new Date(Date.now() + 86400000 * 3).toISOString(),
-    completed: false,
-    createdAt: new Date().toISOString()
+    dueDate: new Date(Date.now() + 86400000 * 3).toISOString()
   });
 
-  saveTasks(tasks);
-  renderTasks();
-  showToast('Task added');
+  if (result) {
+    renderTasks();
+    showToast('Task added');
+  }
 }
 
-function completeTask(id) {
-  const tasks = getTasks();
-  const task = tasks.find(t => t.id === id);
-  if (task) {
-    task.completed = true;
-    saveTasks(tasks);
+async function completeTask(id) {
+  const result = await updateTask(id, { completed: true });
+  if (result) {
     renderTasks();
     showToast('Task completed');
   }
@@ -672,8 +705,8 @@ function completeTask(id) {
 // =====================
 // EXPORT
 // =====================
-function exportCSV() {
-  const prospects = getProspects();
+async function exportCSV() {
+  const prospects = await getProspects();
   const headers = ['Company', 'Contact', 'Email', 'Phone', 'City', 'Postcode', 'Status', 'Notes', 'Created'];
   const rows = prospects.map(p => [
     p.company, p.name, p.email, p.phone, p.city, p.postcode, p.status, p.notes, p.createdAt
@@ -711,17 +744,7 @@ function showToast(message, type) {
 // =====================
 // INIT
 // =====================
-function init() {
-  // Add sample data if empty
-  if (getProspects().length === 0) {
-    const sample = [
-      { id: 'p1', company: 'Cool Air Ltd', name: 'Mark Thompson', email: 'mark@coolair.co.uk', phone: '07700 900123', city: 'Manchester', postcode: 'M1', status: 'contacted', notes: 'Interested, wants to see demo', createdAt: new Date(Date.now() - 86400000).toISOString(), lastContact: new Date(Date.now() - 86400000).toISOString() },
-      { id: 'p2', company: 'Arctic Cooling', name: 'Sarah Chen', email: 'sarah@arcticcooling.com', phone: '07701 900456', city: 'Birmingham', postcode: 'B1', status: 'interested', notes: 'Wants to start with Starter package', createdAt: new Date(Date.now() - 172800000).toISOString(), lastContact: new Date(Date.now() - 86400000).toISOString() },
-      { id: 'p3', company: 'Premier HVAC', name: 'John Davis', email: 'john@premierhvac.co.uk', phone: '07702 900789', city: 'London', postcode: 'SW1', status: 'new', notes: '', createdAt: new Date().toISOString(), lastContact: null }
-    ];
-    saveProspects(sample);
-  }
-
+async function init() {
   renderProspects();
   updateStats();
 }
