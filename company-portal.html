@@ -934,7 +934,7 @@ function viewLead(leadId) {
   fetch(`${API_URL}/leads`)
     .then(r => r.json())
     .then(leads => {
-      const lead = leads.find(l => l.id === leadId);
+      const lead = leads.find(l => l.id == leadId);
       if (!lead) return;
 
       const content = document.getElementById('leadModalContent');
@@ -946,11 +946,11 @@ function viewLead(leadId) {
           </div>
           <div class="lead-detail-item">
             <label>Email</label>
-            <p><a href="mailto:${lead.customerEmail}">${lead.customerEmail}</a></p>
+            <p><a href="mailto:${lead.customer_email}">${lead.customer_email}</a></p>
           </div>
           <div class="lead-detail-item">
             <label>Phone</label>
-            <p>${lead.customerPhone || 'Not provided'}</p>
+            <p>${lead.customer_phone || 'Not provided'}</p>
           </div>
           <div class="lead-detail-item">
             <label>Postcode</label>
