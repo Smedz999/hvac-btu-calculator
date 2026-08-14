@@ -853,8 +853,8 @@ async function loadDashboard() {
       recentContainer.innerHTML = recent.map(lead => `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 0;border-bottom:1px solid var(--border);">
           <div>
-            <strong>${lead.customerName}</strong> — ${lead.postcode}
-            <div style="font-size:0.85rem;color:var(--text-light);">${formatBtu(lead.btu)} BTU • ${formatDate(lead.createdAt)}</div>
+            <strong>${lead.customer_name}</strong> — ${lead.postcode}
+            <div style="font-size:0.85rem;color:var(--text-light);">${formatBtu(lead.btu)} BTU • ${formatDate(lead.created_at)}</div>
           </div>
           <span class="badge badge-${lead.status}">${lead.status}</span>
         </div>
@@ -893,8 +893,8 @@ function renderLeadsTable(leadsToRender) {
   noMsg.style.display = 'none';
   tbody.innerHTML = leadsToRender.map(lead => `
     <tr>
-      <td>${formatDate(lead.createdAt)}</td>
-      <td>${lead.customerName}</td>
+      <td>${formatDate(lead.created_at)}</td>
+      <td>${lead.customer_name}</td>
       <td>${lead.postcode}</td>
       <td>${formatBtu(lead.btu)} BTU</td>
       <td><span class="badge badge-${lead.status}">${lead.status}</span></td>
@@ -919,7 +919,7 @@ async function filterLeads() {
 
     if (search) {
       filtered = filtered.filter(l =>
-        l.customerName?.toLowerCase().includes(search) ||
+        l.customer_name?.toLowerCase().includes(search) ||
         l.postcode?.toLowerCase().includes(search)
       );
     }
@@ -942,7 +942,7 @@ function viewLead(leadId) {
         <div class="lead-detail-grid">
           <div class="lead-detail-item">
             <label>Customer Name</label>
-            <p>${lead.customerName}</p>
+            <p>${lead.customer_name}</p>
           </div>
           <div class="lead-detail-item">
             <label>Email</label>
@@ -962,11 +962,11 @@ function viewLead(leadId) {
           </div>
           <div class="lead-detail-item">
             <label>Room Type</label>
-            <p>${lead.roomType || 'Not specified'}</p>
+            <p>${lead.room_type || 'Not specified'}</p>
           </div>
           <div class="lead-detail-item">
             <label>Submitted</label>
-            <p>${formatDate(lead.createdAt)}</p>
+            <p>${formatDate(lead.created_at)}</p>
           </div>
         </div>
 
@@ -1182,8 +1182,8 @@ async function loadPurchaseHistory() {
       <tbody>
         ${purchases.slice().reverse().map(p => `
           <tr>
-            <td>${formatDate(p.createdAt)}</td>
-            <td>${p.package}</td>
+            <td>${formatDate(p.created_at)}</td>
+            <td>${p.package_name}</td>
             <td>${p.credits}</td>
             <td>${p.amount}</td>
           </tr>
