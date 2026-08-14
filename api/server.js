@@ -1,13 +1,23 @@
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
-
-const { Company, Lead, Purchase, Prospect, Task } = require('./models');
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+// Supabase connection
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY environment variables');
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+console.log('✅ Supabase initialized');
 
 // Initialize services
 let stripe = null;
@@ -44,90 +54,28 @@ try {
   console.log('⚠️ Twilio not configured');
 }
 
-// MongoDB Connection - Serverless optimized
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/acconnx';
-
-let cached = global.mongoose;
-
-if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
-}
-
-async function connectDB() {
-  if (cached.conn) {
-    return cached.conn;
-  }
-
-  if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-      maxPoolSize: 1, // Serverless: single connection
-      serverSelectionTimeoutMS: 10000, // Increased timeout
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 10000,
-      retryWrites: true,
-      retryReads: true,
-    };
-
-    console.log('🔄 Attempting MongoDB connection...');
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      console.log('✅ MongoDB connected');
-      return mongoose;
-    }).catch(err => {
-      console.error('❌ MongoDB connection failed:', err.message);
-      cached.promise = null;
-      throw err;
-    });
-  }
-
-  try {
-    cached.conn = await cached.promise;
-  } catch (e) {
-    cached.promise = null;
-    console.error('❌ MongoDB connection error:', e);
-    throw e;
-  }
-
-  return cached.conn;
-}
-
-// Connect immediately for non-serverless environments
-connectDB().catch(err => console.error('Initial connection failed:', err));
-
 app.use(cors());
 app.use(express.json());
-
-// Middleware to ensure DB is connected before handling requests
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (err) {
-    console.error('Database connection failed:', err);
-    res.status(500).json({ error: 'Database connection failed' });
-  }
-});
 
 // =====================
 // HEALTH CHECK
 // =====================
 app.get('/api/health', async (req, res) => {
   try {
-    await connectDB(); // Ensure DB is connected
-    const companies = await Company.countDocuments();
-    const leads = await Lead.countDocuments();
-    const purchases = await Purchase.countDocuments();
-    
-    res.json({ 
-      status: 'ok', 
+    const { count: companies } = await supabase.from('companies').select('*', { count: 'exact', head: true });
+    const { count: leads } = await supabase.from('leads').select('*', { count: 'exact', head: true });
+    const { count: purchases } = await supabase.from('purchases').select('*', { count: 'exact', head: true });
+
+    res.json({
+      status: 'ok',
       timestamp: new Date().toISOString(),
       stripe: !!stripe,
       resend: !!resend,
       twilio: !!twilio,
-      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-      companies,
-      leads,
-      purchases
+      database: 'supabase-connected',
+      companies: companies || 0,
+      leads: leads || 0,
+      purchases: purchases || 0
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -145,29 +93,36 @@ app.post('/api/companies/register', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const existing = await Company.findOne({ email });
+    // Check if email already exists
+    const { data: existing } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('email', email)
+      .single();
+
     if (existing) {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
-    // Hash password before saving
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-    
-    const companyData = new Company({
-      company,
-      name,
-      email,
-      phone,
-      password: hashedPassword,
-      postcode: postcode.toUpperCase(),
-      radius: radius || 25,
-      credits: 5, // 5 free credits
-      hasPurchased: false,
-      notifyEmail: true,
-      notifySMS: false
-    });
 
-    await companyData.save();
+    const { data: companyData, error } = await supabase
+      .from('companies')
+      .insert({
+        company,
+        name,
+        email,
+        phone,
+        password: hashedPassword,
+        postcode: postcode.toUpperCase(),
+        radius: radius || 25,
+        credits: 5
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
 
     // Send welcome email
     if (resend) {
@@ -183,9 +138,8 @@ app.post('/api/companies/register', async (req, res) => {
       }
     }
 
-    const companyObj = companyData.toObject();
-    delete companyObj.password;
-    res.json({ success: true, company: companyObj });
+    delete companyData.password;
+    res.json({ success: true, company: companyData });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -194,21 +148,24 @@ app.post('/api/companies/register', async (req, res) => {
 app.post('/api/companies/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const company = await Company.findOne({ email });
 
-    if (!company) {
+    const { data: company, error } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (error || !company) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Compare hashed password
     const isMatch = await bcrypt.compare(password, company.password);
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const companyObj = company.toObject();
-    delete companyObj.password;
-    res.json({ success: true, company: companyObj });
+    delete company.password;
+    res.json({ success: true, company });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -216,7 +173,11 @@ app.post('/api/companies/login', async (req, res) => {
 
 app.get('/api/companies', async (req, res) => {
   try {
-    const companies = await Company.find().select('-password');
+    const { data: companies, error } = await supabase
+      .from('companies')
+      .select('id, company, name, email, phone, postcode, radius, credits, created_at, updated_at');
+
+    if (error) throw error;
     res.json(companies);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -225,13 +186,20 @@ app.get('/api/companies', async (req, res) => {
 
 app.put('/api/companies/:id', async (req, res) => {
   try {
-    const company = await Company.findByIdAndUpdate(
-      req.params.id,
-      { ...req.body },
-      { new: true }
-    ).select('-password');
-    
+    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    delete updates.id;
+    delete updates.password;
+
+    const { data: company, error } = await supabase
+      .from('companies')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select('id, company, name, email, phone, postcode, radius, credits, created_at, updated_at')
+      .single();
+
+    if (error) throw error;
     if (!company) return res.status(404).json({ error: 'Company not found' });
+
     res.json({ success: true, company });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -245,19 +213,22 @@ app.post('/api/leads', async (req, res) => {
   try {
     const { customerName, customerEmail, customerPhone, postcode, btu, roomType, propertyType, notes } = req.body;
 
-    const lead = new Lead({
-      customerName,
-      customerEmail,
-      customerPhone,
-      postcode: postcode?.toUpperCase(),
-      btu,
-      roomType,
-      propertyType,
-      notes,
-      status: 'new'
-    });
+    const { data: lead, error } = await supabase
+      .from('leads')
+      .insert({
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: customerPhone,
+        postcode: postcode?.toUpperCase(),
+        btu,
+        room_type: roomType,
+        property_type: propertyType,
+        status: 'new'
+      })
+      .select()
+      .single();
 
-    await lead.save();
+    if (error) throw error;
 
     // Auto-distribute to matching companies
     const distributed = await distributeLead(lead);
@@ -271,11 +242,14 @@ app.post('/api/leads', async (req, res) => {
 app.get('/api/leads', async (req, res) => {
   try {
     const { companyId } = req.query;
-    let query = {};
+    let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
+
     if (companyId) {
-      query.companyId = companyId;
+      query = query.eq('assigned_to', companyId);
     }
-    const leads = await Lead.find(query).sort({ createdAt: -1 });
+
+    const { data: leads, error } = await query;
+    if (error) throw error;
     res.json(leads);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -284,13 +258,19 @@ app.get('/api/leads', async (req, res) => {
 
 app.put('/api/leads/:id', async (req, res) => {
   try {
-    const lead = await Lead.findByIdAndUpdate(
-      req.params.id,
-      { ...req.body, statusUpdatedAt: new Date() },
-      { new: true }
-    );
-    
+    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    delete updates.id;
+
+    const { data: lead, error } = await supabase
+      .from('leads')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) throw error;
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
     res.json({ success: true, lead });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -314,7 +294,7 @@ app.post('/api/create-payment-intent', async (req, res) => {
   try {
     const { packageId, companyId, isFirstPurchase } = req.body;
     const pkg = CREDIT_PACKAGES[packageId];
-    
+
     if (!pkg) return res.status(400).json({ error: 'Invalid package' });
 
     const amount = isFirstPurchase ? pkg.firstPrice : pkg.price;
@@ -335,22 +315,40 @@ app.post('/api/confirm-payment', async (req, res) => {
   try {
     const { companyId, packageId, credits, amount, isFirstPurchase } = req.body;
 
-    const company = await Company.findById(companyId);
-    if (!company) return res.status(404).json({ error: 'Company not found' });
+    // Get current company
+    const { data: company, error: fetchError } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('id', companyId)
+      .single();
 
-    company.credits = (company.credits || 0) + credits;
-    company.hasPurchased = true;
-    await company.save();
+    if (fetchError || !company) return res.status(404).json({ error: 'Company not found' });
 
-    const purchase = new Purchase({
-      companyId,
-      package: packageId,
-      credits,
-      amount: '£' + (amount / 100).toFixed(2),
-      isFirstPurchase: isFirstPurchase || false
-    });
+    // Update credits
+    const newCredits = (company.credits || 0) + credits;
+    const { data: updatedCompany, error: updateError } = await supabase
+      .from('companies')
+      .update({ credits: newCredits, updated_at: new Date().toISOString() })
+      .eq('id', companyId)
+      .select()
+      .single();
 
-    await purchase.save();
+    if (updateError) throw updateError;
+
+    // Record purchase
+    const { data: purchase, error: purchaseError } = await supabase
+      .from('purchases')
+      .insert({
+        company_id: companyId,
+        package_name: packageId,
+        credits,
+        amount: amount / 100,
+        status: 'completed'
+      })
+      .select()
+      .single();
+
+    if (purchaseError) throw purchaseError;
 
     // Send receipt email
     if (resend) {
@@ -359,16 +357,15 @@ app.post('/api/confirm-payment', async (req, res) => {
           from: 'ACConnx <receipts@acconnx.com>',
           to: company.email,
           subject: 'Payment Confirmation - ACConnx',
-          html: `<h1>Thank you for your purchase!</h1><p>You bought ${credits} credits for £${(amount / 100).toFixed(2)}.</p><p>Your new balance: ${company.credits} credits</p><p><a href="https://acconnx.com/company-portal.html">View Dashboard</a></p>`
+          html: `<h1>Thank you for your purchase!</h1><p>You bought ${credits} credits for £${(amount / 100).toFixed(2)}.</p><p>Your new balance: ${newCredits} credits</p><p><a href="https://acconnx.com/company-portal.html">View Dashboard</a></p>`
         });
       } catch (e) {
         console.log('Failed to send receipt:', e.message);
       }
     }
 
-    const companyObj = company.toObject();
-    delete companyObj.password;
-    res.json({ success: true, company: companyObj, purchase });
+    delete updatedCompany.password;
+    res.json({ success: true, company: updatedCompany, purchase });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -379,23 +376,20 @@ app.post('/api/confirm-payment', async (req, res) => {
 // =====================
 app.get('/api/admin/stats', async (req, res) => {
   try {
-    const purchases = await Purchase.find();
-    const totalRevenue = purchases.reduce((sum, p) => {
-      const amount = parseFloat(p.amount?.replace(/[^0-9.]/g, '') || 0);
-      return sum + amount;
-    }, 0);
+    const { data: purchases } = await supabase.from('purchases').select('*');
+    const { count: totalCompanies } = await supabase.from('companies').select('*', { count: 'exact', head: true });
+    const { count: totalLeads } = await supabase.from('leads').select('*', { count: 'exact', head: true }).is('assigned_to', null);
+    const { count: distributedLeads } = await supabase.from('leads').select('*', { count: 'exact', head: true }).not('assigned_to', 'is', null);
+    const { count: wonLeads } = await supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'won');
 
-    const totalCompanies = await Company.countDocuments();
-    const totalLeads = await Lead.countDocuments({ companyId: { $exists: false } });
-    const distributedLeads = await Lead.countDocuments({ companyId: { $exists: true } });
-    const wonLeads = await Lead.countDocuments({ status: 'won' });
+    const totalRevenue = (purchases || []).reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
 
     res.json({
       totalRevenue: totalRevenue.toFixed(2),
-      totalCompanies,
-      totalLeads,
-      distributedLeads,
-      totalCredits: purchases.reduce((sum, p) => sum + (p.credits || 0), 0),
+      totalCompanies: totalCompanies || 0,
+      totalLeads: totalLeads || 0,
+      distributedLeads: distributedLeads || 0,
+      totalCredits: (purchases || []).reduce((sum, p) => sum + (p.credits || 0), 0),
       conversionRate: distributedLeads > 0 ? Math.round((wonLeads / distributedLeads) * 100) : 0
     });
   } catch (err) {
@@ -412,56 +406,53 @@ async function distributeLead(lead) {
     if (!leadPrefix) return [];
 
     // Find eligible companies (have credits, matching postcode area)
-    const eligible = await Company.find({
-      credits: { $gt: 0 },
-      $or: [
-        { postcode: { $regex: `^${leadPrefix}`, $options: 'i' } },
-        { postcode: { $regex: `^${leadPrefix.substring(0, 2)}`, $options: 'i' } }
-      ]
-    }).sort({ credits: -1 }).limit(3);
+    const { data: eligible, error } = await supabase
+      .from('companies')
+      .select('*')
+      .gt('credits', 0)
+      .or(`postcode.ilike.${leadPrefix}%,postcode.ilike.${leadPrefix.substring(0, 2)}%`)
+      .order('credits', { ascending: false })
+      .limit(3);
+
+    if (error) throw error;
+    if (!eligible || eligible.length === 0) return [];
 
     for (const company of eligible) {
-      company.credits = (company.credits || 0) - 1;
-      await company.save();
+      // Deduct credit
+      await supabase
+        .from('companies')
+        .update({ credits: company.credits - 1, updated_at: new Date().toISOString() })
+        .eq('id', company.id);
 
-      const companyLead = new Lead({
-        ...lead.toObject(),
-        _id: undefined,
-        originalLeadId: lead._id,
-        companyId: company._id,
-        status: 'new',
-        assignedAt: new Date()
-      });
-
-      await companyLead.save();
-
-      // Send SMS notification
-      if (twilio && company.notifySMS === true && company.phone) {
-        try {
-          await twilio.messages.create({
-            body: `🔥 ACConnx Lead: ${lead.customerName} in ${lead.postcode}. ${lead.btu ? lead.btu.toLocaleString() + ' BTU' : 'BTU TBD'}. Login: acconnx.com/company-portal.html`,
-            to: company.phone,
-            from: process.env.TWILIO_PHONE_NUMBER || 'ACConnx'
-          });
-        } catch (e) {
-          console.log('Failed to send SMS:', e.message);
-        }
-      }
+      // Create assigned lead copy
+      await supabase
+        .from('leads')
+        .insert({
+          customer_name: lead.customer_name,
+          customer_email: lead.customer_email,
+          customer_phone: lead.customer_phone,
+          postcode: lead.postcode,
+          btu: lead.btu,
+          room_type: lead.room_type,
+          property_type: lead.property_type,
+          status: 'new',
+          assigned_to: company.id
+        });
 
       // Send email notification
-      if (resend && company.notifyEmail !== false) {
+      if (resend) {
         try {
           await resend.emails.send({
             from: 'ACConnx <leads@acconnx.com>',
             to: company.email,
-            subject: '🔥 New Lead: ' + lead.customerName + ' - ' + lead.postcode,
+            subject: '🔥 New Lead: ' + lead.customer_name + ' - ' + lead.postcode,
             html: `<h1>New Lead Alert!</h1>
-              <p><strong>Customer:</strong> ${lead.customerName}</p>
-              <p><strong>Email:</strong> ${lead.customerEmail}</p>
-              <p><strong>Phone:</strong> ${lead.customerPhone || 'Not provided'}</p>
+              <p><strong>Customer:</strong> ${lead.customer_name}</p>
+              <p><strong>Email:</strong> ${lead.customer_email}</p>
+              <p><strong>Phone:</strong> ${lead.customer_phone || 'Not provided'}</p>
               <p><strong>Postcode:</strong> ${lead.postcode}</p>
               <p><strong>BTU Required:</strong> ${lead.btu?.toLocaleString() || 'Not calculated'}</p>
-              <p><strong>Room Type:</strong> ${lead.roomType || 'Not specified'}</p>
+              <p><strong>Room Type:</strong> ${lead.room_type || 'Not specified'}</p>
               <p><a href="https://acconnx.com/company-portal.html">View in Dashboard</a></p>
               <p><em>Contact within 15 minutes for best results!</em></p>`
           });
@@ -483,7 +474,12 @@ async function distributeLead(lead) {
 // =====================
 app.get('/api/prospects', async (req, res) => {
   try {
-    const prospects = await Prospect.find().sort({ createdAt: -1 });
+    const { data: prospects, error } = await supabase
+      .from('prospects')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
     res.json(prospects);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -493,23 +489,26 @@ app.get('/api/prospects', async (req, res) => {
 app.post('/api/prospects', async (req, res) => {
   try {
     const { company, name, email, phone, city, postcode, status, notes } = req.body;
-    
+
     if (!company || !name || !email) {
       return res.status(400).json({ error: 'Company, name, and email are required' });
     }
 
-    const prospect = new Prospect({
-      company,
-      name,
-      email,
-      phone,
-      city,
-      postcode,
-      status: status || 'new',
-      notes
-    });
+    const { data: prospect, error } = await supabase
+      .from('prospects')
+      .insert({
+        company,
+        contact: name,
+        email,
+        phone,
+        city,
+        status: status || 'new',
+        notes
+      })
+      .select()
+      .single();
 
-    await prospect.save();
+    if (error) throw error;
     res.json({ success: true, prospect });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -518,13 +517,19 @@ app.post('/api/prospects', async (req, res) => {
 
 app.put('/api/prospects/:id', async (req, res) => {
   try {
-    const prospect = await Prospect.findByIdAndUpdate(
-      req.params.id,
-      { ...req.body, lastContact: new Date() },
-      { new: true }
-    );
-    
+    const updates = { ...req.body, updated_at: new Date().toISOString(), last_contact: new Date().toISOString() };
+    delete updates.id;
+
+    const { data: prospect, error } = await supabase
+      .from('prospects')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) throw error;
     if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+
     res.json({ success: true, prospect });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -533,8 +538,12 @@ app.put('/api/prospects/:id', async (req, res) => {
 
 app.delete('/api/prospects/:id', async (req, res) => {
   try {
-    const prospect = await Prospect.findByIdAndDelete(req.params.id);
-    if (!prospect) return res.status(404).json({ error: 'Prospect not found' });
+    const { error } = await supabase
+      .from('prospects')
+      .delete()
+      .eq('id', req.params.id);
+
+    if (error) throw error;
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -546,7 +555,12 @@ app.delete('/api/prospects/:id', async (req, res) => {
 // =====================
 app.get('/api/tasks', async (req, res) => {
   try {
-    const tasks = await Task.find().sort({ dueDate: 1 });
+    const { data: tasks, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .order('due_date', { ascending: true });
+
+    if (error) throw error;
     res.json(tasks);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -555,20 +569,24 @@ app.get('/api/tasks', async (req, res) => {
 
 app.post('/api/tasks', async (req, res) => {
   try {
-    const { prospectId, company, text, dueDate } = req.body;
-    
-    if (!text) {
-      return res.status(400).json({ error: 'Task text is required' });
+    const { title, description, dueDate, prospectId } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
     }
 
-    const task = new Task({
-      prospectId,
-      company,
-      text,
-      dueDate: dueDate || new Date(Date.now() + 86400000 * 3) // 3 days default
-    });
+    const { data: task, error } = await supabase
+      .from('tasks')
+      .insert({
+        title,
+        description,
+        due_date: dueDate,
+        prospect_id: prospectId
+      })
+      .select()
+      .single();
 
-    await task.save();
+    if (error) throw error;
     res.json({ success: true, task });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -577,13 +595,19 @@ app.post('/api/tasks', async (req, res) => {
 
 app.put('/api/tasks/:id', async (req, res) => {
   try {
-    const task = await Task.findByIdAndUpdate(
-      req.params.id,
-      { ...req.body },
-      { new: true }
-    );
-    
+    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    delete updates.id;
+
+    const { data: task, error } = await supabase
+      .from('tasks')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) throw error;
     if (!task) return res.status(404).json({ error: 'Task not found' });
+
     res.json({ success: true, task });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -592,8 +616,12 @@ app.put('/api/tasks/:id', async (req, res) => {
 
 app.delete('/api/tasks/:id', async (req, res) => {
   try {
-    const task = await Task.findByIdAndDelete(req.params.id);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
+    const { error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', req.params.id);
+
+    if (error) throw error;
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -603,15 +631,14 @@ app.delete('/api/tasks/:id', async (req, res) => {
 // =====================
 // START SERVER
 // =====================
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.VERCEL) {
+  module.exports = app;
+} else {
   app.listen(port, () => {
     console.log(`🚀 ACConnx API running on port ${port}`);
-    console.log(`📊 Health check: http://localhost:${port}/api/health`);
     console.log(`💳 Stripe: ${stripe ? '✅ Connected' : '⚠️ Not configured'}`);
     console.log(`📧 Resend: ${resend ? '✅ Connected' : '⚠️ Not configured'}`);
     console.log(`📱 Twilio: ${twilio ? '✅ Connected' : '⚠️ Not configured'}`);
-    console.log(`🗄️  MongoDB: ${mongoose.connection.readyState === 1 ? '✅ Connected' : '⚠️ Not configured'}`);
+    console.log(`🗄️ Database: ✅ Supabase`);
   });
 }
-
-module.exports = app;
