@@ -44,21 +44,68 @@ try {
   console.log('⚠️ Twilio not configured');
 }
 
-// MongoDB Connection
+// MongoDB Connection - Serverless optimized
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/acconnx';
 
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
+async function connectDB() {
+  if (cached.conn) {
+    return cached.conn;
+  }
+
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false,
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    };
+
+    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
+      console.log('✅ MongoDB connected');
+      return mongoose;
+    });
+  }
+
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    console.error('❌ MongoDB connection error:', e);
+    throw e;
+  }
+
+  return cached.conn;
+}
+
+// Connect immediately for non-serverless environments
+connectDB().catch(err => console.error('Initial connection failed:', err));
 
 app.use(cors());
 app.use(express.json());
+
+// Middleware to ensure DB is connected before handling requests
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('Database connection failed:', err);
+    res.status(500).json({ error: 'Database connection failed' });
+  }
+});
 
 // =====================
 // HEALTH CHECK
 // =====================
 app.get('/api/health', async (req, res) => {
   try {
+    await connectDB(); // Ensure DB is connected
     const companies = await Company.countDocuments();
     const leads = await Lead.countDocuments();
     const purchases = await Purchase.countDocuments();
