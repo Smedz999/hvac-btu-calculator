@@ -373,9 +373,8 @@ app.post('/api/confirm-payment', async (req, res) => {
 });
 
 // =====================
-// ADMIN STATS
+// ADMIN
 // =====================
-app.get('/api/admin/stats', async (req, res) => {
 app.get('/api/admin/purchases', async (req, res) => {
   try {
     const { data: purchases, error } = await supabase
