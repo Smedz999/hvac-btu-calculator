@@ -832,6 +832,16 @@ async function loadDashboard() {
   if (!currentUser) return;
 
   try {
+    // Refresh user data from database to get live credit count
+    const userRes = await fetch(`${API_URL}/companies`);
+    const companies = await userRes.json();
+    const freshUser = companies.find(c => c.id === currentUser.id);
+    if (freshUser) {
+      currentUser = { ...currentUser, ...freshUser };
+      localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+      updateNavCredits();
+    }
+
     const res = await fetch(`${API_URL}/leads?companyId=${currentUser.id}`);
     const userLeads = await res.json();
 
@@ -872,6 +882,16 @@ async function loadLeads() {
   if (!currentUser) return;
 
   try {
+    // Refresh user data from database
+    const userRes = await fetch(`${API_URL}/companies`);
+    const companies = await userRes.json();
+    const freshUser = companies.find(c => c.id === currentUser.id);
+    if (freshUser) {
+      currentUser = { ...currentUser, ...freshUser };
+      localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+      updateNavCredits();
+    }
+
     const res = await fetch(`${API_URL}/leads?companyId=${currentUser.id}`);
     const leads = await res.json();
     renderLeadsTable(leads);
