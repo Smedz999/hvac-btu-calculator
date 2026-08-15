@@ -411,14 +411,41 @@ async function distributeLead(lead) {
       .from('companies')
       .select('*')
       .gt('credits', 0)
-      .or(`postcode.ilike.${leadPrefix}%,postcode.ilike.${leadPrefix.substring(0, 2)}%`)
-      .order('credits', { ascending: false })
-      .limit(3);
+      .or(`postcode.ilike.${leadPrefix}%,postcode.ilike.${leadPrefix.substring(0, 2)}%`);
 
     if (error) throw error;
     if (!eligible || eligible.length === 0) return [];
 
-    for (const company of eligible) {
+    // Count leads already received per company
+    const companyIds = eligible.map(c => c.id);
+    const { data: leadCounts } = await supabase
+      .from('leads')
+      .select('assigned_to')
+      .in('assigned_to', companyIds)
+      .not('assigned_to', 'is', null);
+
+    // Build lead count map
+    const countMap = {};
+    eligible.forEach(c => { countMap[c.id] = 0; });
+    if (leadCounts) {
+      leadCounts.forEach(l => {
+        if (countMap[l.assigned_to] !== undefined) {
+          countMap[l.assigned_to]++;
+        }
+      });
+    }
+
+    // Sort by fewest leads received, then by most credits as tiebreaker
+    eligible.sort((a, b) => {
+      const countDiff = (countMap[a.id] || 0) - (countMap[b.id] || 0);
+      if (countDiff !== 0) return countDiff;
+      return b.credits - a.credits;
+    });
+
+    // Take top 3
+    const selected = eligible.slice(0, 3);
+
+    for (const company of selected) {
       // Deduct credit
       await supabase
         .from('companies')
@@ -463,7 +490,7 @@ async function distributeLead(lead) {
       }
     }
 
-    return eligible.map(c => c.company);
+    return selected.map(c => c.company);
   } catch (err) {
     console.error('Lead distribution error:', err);
     return [];
