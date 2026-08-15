@@ -3,78 +3,163 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HVAC Lead Pro — Get Qualified AC Leads | Join Our Contractor Network</title>
-  <meta name="description" content="Join HVAC Lead Pro and get qualified air conditioning installation leads in your area. Pay per lead, no subscription. Homeowners who already know their BTU requirements.">
+  <title>ACConnx for Contractors — Get Qualified AC Installation Leads</title>
+  <meta name="description" content="Join ACConnx and receive pre-qualified air conditioning installation leads in your area. Pay per lead, no subscription. 5 free credits on signup.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <style>
     :root {
-      --primary: #0f4c81;
-      --primary-dark: #0a3356;
-      --accent: #00a896;
-      --accent-dark: #008c7a;
+      --primary: #0a2540;
+      --primary-light: #1a3a5c;
+      --accent: #00d4aa;
+      --accent-dark: #00b894;
+      --accent-light: rgba(0, 212, 170, 0.1);
       --warning: #f59e0b;
       --success: #10b981;
-      --text: #1f2937;
-      --text-light: #6b7280;
+      --text: #1e293b;
+      --text-light: #64748b;
       --bg: #f8fafc;
       --card: #ffffff;
       --border: #e2e8f0;
-      --shadow: 0 10px 40px rgba(15, 76, 129, 0.12);
-      --radius: 12px;
-    }
-    nav.topnav {
-      background: var(--primary-dark);
-      padding: 0.75rem 1rem;
-      text-align: center;
-    }
-    nav.topnav a {
-      color: rgba(255,255,255,0.8);
-      text-decoration: none;
-      margin: 0 1rem;
-      font-size: 0.9rem;
-    }
-    nav.topnav a.active {
-      color: white;
-      font-weight: 600;
+      --shadow: 0 4px 24px rgba(10, 37, 64, 0.08);
+      --shadow-lg: 0 10px 40px rgba(10, 37, 64, 0.12);
+      --radius: 16px;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.6;
     }
 
+    /* Nav */
+    .nav {
+      background: var(--primary);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-logo {
+      color: white;
+      font-size: 1.5rem;
+      font-weight: 800;
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-logo span {
+      color: var(--accent);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+    }
+
+    .nav-links a {
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: white;
+    }
+
+    .nav-cta {
+      background: var(--accent);
+      color: var(--primary) !important;
+      padding: 0.5rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 700 !important;
+    }
+
+    .nav-cta:hover {
+      background: var(--accent-dark);
+      color: white !important;
+    }
+
     /* Hero */
     .hero {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
       color: white;
-      padding: 5rem 2rem;
+      padding: 5rem 2rem 4rem;
       text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(0,212,170,0.15) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      background: rgba(0,212,170,0.2);
+      border: 1px solid rgba(0,212,170,0.4);
+      color: var(--accent);
+      padding: 0.4rem 1rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
     }
 
     .hero h1 {
-      font-size: 3rem;
-      font-weight: 800;
+      font-size: 3.25rem;
+      font-weight: 900;
       margin-bottom: 1rem;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+
+    .hero h1 em {
+      color: var(--accent);
+      font-style: normal;
     }
 
     .hero p {
       font-size: 1.25rem;
-      opacity: 0.9;
-      max-width: 600px;
+      opacity: 0.85;
+      max-width: 640px;
       margin: 0 auto 2rem;
+      font-weight: 400;
+    }
+
+    .hero-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 3rem;
     }
 
     .hero-stats {
       display: flex;
       justify-content: center;
       gap: 3rem;
-      margin-top: 3rem;
       flex-wrap: wrap;
+      position: relative;
+      z-index: 1;
     }
 
     .hero-stat {
@@ -84,11 +169,13 @@
     .hero-stat-value {
       font-size: 2.5rem;
       font-weight: 800;
+      color: var(--accent);
     }
 
     .hero-stat-label {
       font-size: 0.9rem;
-      opacity: 0.8;
+      opacity: 0.7;
+      margin-top: 0.25rem;
     }
 
     /* Buttons */
@@ -99,39 +186,58 @@
       gap: 0.5rem;
       padding: 1rem 2rem;
       border: none;
-      border-radius: 8px;
-      font-size: 1.1rem;
+      border-radius: 10px;
+      font-size: 1.05rem;
       font-weight: 700;
       cursor: pointer;
       transition: all 0.2s;
       text-decoration: none;
+      font-family: 'Inter', sans-serif;
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
-      color: white;
-      box-shadow: 0 4px 14px rgba(0, 168, 150, 0.3);
+      background: var(--accent);
+      color: var(--primary);
+      box-shadow: 0 4px 14px rgba(0, 212, 170, 0.3);
     }
 
     .btn-primary:hover {
+      background: var(--accent-dark);
+      color: white;
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0, 168, 150, 0.35);
+      box-shadow: 0 6px 20px rgba(0, 212, 170, 0.4);
     }
 
-    .btn-white {
-      background: white;
-      color: var(--primary);
+    .btn-outline {
+      background: transparent;
+      color: white;
+      border: 2px solid rgba(255,255,255,0.3);
     }
 
-    .btn-white:hover {
-      background: var(--bg);
+    .btn-outline:hover {
+      border-color: white;
+      background: rgba(255,255,255,0.1);
+    }
+
+    .btn-dark {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-dark:hover {
+      background: var(--primary-light);
+      transform: translateY(-2px);
     }
 
     /* Sections */
     .section {
-      padding: 4rem 2rem;
-      max-width: 1200px;
+      padding: 4.5rem 2rem;
+      max-width: 1100px;
       margin: 0 auto;
+    }
+
+    .section-alt {
+      background: white;
     }
 
     .section-title {
@@ -139,22 +245,23 @@
       font-size: 2.25rem;
       font-weight: 800;
       color: var(--primary);
-      margin-bottom: 1rem;
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.02em;
     }
 
     .section-subtitle {
       text-align: center;
       color: var(--text-light);
       font-size: 1.1rem;
-      max-width: 600px;
+      max-width: 560px;
       margin: 0 auto 3rem;
     }
 
     /* How It Works */
     .steps {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 2rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
     }
 
     .step {
@@ -164,38 +271,109 @@
       border: 1px solid var(--border);
       padding: 2rem;
       text-align: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .step:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
     }
 
     .step-number {
-      width: 50px;
-      height: 50px;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
-      color: white;
-      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      background: var(--accent);
+      color: var(--primary);
+      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.5rem;
+      font-size: 1.25rem;
       font-weight: 800;
       margin: 0 auto 1rem;
     }
 
     .step h3 {
-      font-size: 1.25rem;
+      font-size: 1.1rem;
       color: var(--primary);
       margin-bottom: 0.5rem;
+      font-weight: 700;
     }
 
     .step p {
       color: var(--text-light);
+      font-size: 0.95rem;
+    }
+
+    /* Benefits */
+    .benefits {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .benefit {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .benefit:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .benefit-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--accent-light);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    .benefit h3 {
+      color: var(--primary);
+      margin-bottom: 0.25rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .benefit p {
+      color: var(--text-light);
+      font-size: 0.9rem;
     }
 
     /* Pricing */
+    .pricing-note {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .pricing-note span {
+      display: inline-block;
+      background: var(--accent-light);
+      border: 1px solid rgba(0,212,170,0.3);
+      color: var(--accent-dark);
+      padding: 0.5rem 1.25rem;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
     .pricing-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 2rem;
-      max-width: 1000px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      max-width: 960px;
       margin: 0 auto;
     }
 
@@ -204,10 +382,10 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       border: 2px solid var(--border);
-      padding: 2.5rem;
+      padding: 2.5rem 2rem;
       text-align: center;
       position: relative;
-      transition: transform 0.2s;
+      transition: transform 0.2s, border-color 0.2s;
     }
 
     .pricing-card:hover {
@@ -217,325 +395,332 @@
 
     .pricing-card.featured {
       border-color: var(--accent);
-      transform: scale(1.05);
+      box-shadow: 0 8px 30px rgba(0, 212, 170, 0.15);
     }
 
     .pricing-card.featured::before {
       content: "MOST POPULAR";
       position: absolute;
-      top: -12px;
+      top: -13px;
       left: 50%;
       transform: translateX(-50%);
       background: var(--accent);
-      color: white;
+      color: var(--primary);
       padding: 0.35rem 1.25rem;
       border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 700;
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
     }
 
     .pricing-name {
-      font-size: 1.5rem;
+      font-size: 1.25rem;
       font-weight: 700;
       color: var(--primary);
       margin-bottom: 0.5rem;
     }
 
     .pricing-price {
-      font-size: 3.5rem;
-      font-weight: 800;
-      color: var(--text);
+      font-size: 3rem;
+      font-weight: 900;
+      color: var(--primary);
+      line-height: 1;
+      margin-bottom: 0.25rem;
     }
 
     .pricing-price span {
-      font-size: 1.1rem;
+      font-size: 1rem;
       color: var(--text-light);
-      font-weight: 400;
+      font-weight: 500;
+    }
+
+    .pricing-per {
+      color: var(--accent-dark);
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
     }
 
     .pricing-features {
       list-style: none;
-      margin: 2rem 0;
+      margin: 1.5rem 0 2rem;
       text-align: left;
     }
 
     .pricing-features li {
-      padding: 0.75rem 0;
+      padding: 0.6rem 0;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       gap: 0.75rem;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    .pricing-features li:last-child {
+      border-bottom: none;
     }
 
     .pricing-features li::before {
       content: "✓";
-      color: var(--success);
-      font-weight: 700;
-      font-size: 1.2rem;
-    }
-
-    /* Benefits */
-    .benefits {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 2rem;
-    }
-
-    .benefit {
-      display: flex;
-      gap: 1rem;
-      align-items: flex-start;
-    }
-
-    .benefit-icon {
-      font-size: 2rem;
-      flex-shrink: 0;
-    }
-
-    .benefit h3 {
-      color: var(--primary);
-      margin-bottom: 0.5rem;
-    }
-
-    .benefit p {
-      color: var(--text-light);
-    }
-
-    /* Testimonials */
-    .testimonials {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 2rem;
-    }
-
-    .testimonial {
-      background: var(--card);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      border: 1px solid var(--border);
-      padding: 2rem;
-    }
-
-    .testimonial-text {
-      font-style: italic;
-      color: var(--text);
-      margin-bottom: 1rem;
-      font-size: 1.05rem;
-    }
-
-    .testimonial-author {
-      font-weight: 700;
-      color: var(--primary);
-    }
-
-    .testimonial-company {
-      color: var(--text-light);
-      font-size: 0.9rem;
-    }
-
-    /* CTA Section */
-    .cta {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-      color: white;
-      padding: 4rem 2rem;
-      text-align: center;
-    }
-
-    .cta h2 {
-      font-size: 2.5rem;
+      color: var(--accent);
       font-weight: 800;
-      margin-bottom: 1rem;
-    }
-
-    .cta p {
-      font-size: 1.2rem;
-      opacity: 0.9;
-      margin-bottom: 2rem;
+      font-size: 1.1rem;
     }
 
     /* FAQ */
+    .faq-list {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
     .faq-item {
       background: var(--card);
-      border-radius: var(--radius);
+      border-radius: 12px;
       box-shadow: var(--shadow);
       border: 1px solid var(--border);
-      margin-bottom: 1rem;
+      margin-bottom: 0.75rem;
       overflow: hidden;
     }
 
     .faq-question {
-      padding: 1.25rem;
+      padding: 1.25rem 1.5rem;
       font-weight: 700;
       color: var(--primary);
       cursor: pointer;
       display: flex;
       justify-content: space-between;
       align-items: center;
-    }
-
-    .faq-answer {
-      padding: 0 1.25rem;
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.3s, padding 0.3s;
-      color: var(--text-light);
-    }
-
-    .faq-item.active .faq-answer {
-      padding: 0 1.25rem 1.25rem;
-      max-height: 200px;
-    }
-
-    .faq-item.active .faq-question::after {
-      content: "−";
+      font-size: 1rem;
+      user-select: none;
     }
 
     .faq-question::after {
       content: "+";
       font-size: 1.5rem;
       color: var(--accent);
+      font-weight: 400;
+      transition: transform 0.2s;
+    }
+
+    .faq-item.active .faq-question::after {
+      content: "−";
+    }
+
+    .faq-answer {
+      padding: 0 1.5rem;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease, padding 0.3s ease;
+      color: var(--text-light);
+      font-size: 0.95rem;
+    }
+
+    .faq-item.active .faq-answer {
+      padding: 0 1.5rem 1.25rem;
+      max-height: 300px;
+    }
+
+    /* CTA */
+    .cta {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      padding: 4.5rem 2rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta::before {
+      content: '';
+      position: absolute;
+      bottom: -50%;
+      left: -10%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(0,212,170,0.1) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    .cta h2 {
+      font-size: 2.5rem;
+      font-weight: 900;
+      margin-bottom: 1rem;
+      letter-spacing: -0.02em;
+      position: relative;
+    }
+
+    .cta p {
+      font-size: 1.15rem;
+      opacity: 0.85;
+      margin-bottom: 2rem;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+      position: relative;
+    }
+
+    .cta .btn {
+      position: relative;
     }
 
     /* Footer */
-    footer {
-      background: var(--text);
-      color: white;
-      padding: 3rem 2rem;
+    .footer {
+      background: var(--primary);
+      color: rgba(255,255,255,0.6);
+      padding: 2.5rem 2rem;
       text-align: center;
+      font-size: 0.875rem;
+      border-top: 1px solid rgba(255,255,255,0.1);
     }
 
-    footer a {
-      color: var(--accent);
+    .footer p {
+      margin-bottom: 0.5rem;
+    }
+
+    .footer a {
+      color: rgba(255,255,255,0.8);
       text-decoration: none;
+      margin: 0 0.75rem;
+      font-weight: 500;
+      transition: color 0.2s;
     }
 
-    .footer-links {
-      display: flex;
-      justify-content: center;
-      gap: 2rem;
-      margin-bottom: 1.5rem;
-      flex-wrap: wrap;
-    }
-
-    .footer-links a {
-      color: rgba(255,255,255,0.7);
-    }
-
-    .footer-links a:hover {
+    .footer a:hover {
       color: white;
     }
 
     @media (max-width: 768px) {
-      .hero h1 { font-size: 2rem; }
+      .hero h1 { font-size: 2.25rem; }
       .hero-stats { gap: 1.5rem; }
-      .pricing-card.featured { transform: scale(1); }
-      .section { padding: 2rem 1rem; }
+      .hero-stat-value { font-size: 2rem; }
+      .section { padding: 3rem 1rem; }
+      .pricing-card.featured { transform: none; }
+      .nav { padding: 0.75rem 1rem; }
+      .nav-links a:not(.nav-cta) { display: none; }
     }
   </style>
 </head>
 <body>
-  <!-- Contractor portal only -->
+
+<!-- Nav -->
+<nav class="nav">
+  <a href="/" class="nav-logo">ACC<span>onn</span>X</a>
+  <div class="nav-links">
+    <a href="#how-it-works">How It Works</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
+    <a href="/company-portal.html" class="nav-cta">Sign Up Free</a>
+  </div>
+</nav>
 
 <!-- Hero -->
 <section class="hero">
-  <h1>🔥 Get Qualified AC Installation Leads</h1>
-  <p>Homeowners who have already calculated their BTU requirements. Ready to buy. Delivered instantly to your inbox.</p>
-  <div>
-    <a href="company-portal.html" class="btn btn-primary" style="margin-right:1rem;">Join Free →</a>
-    <a href="#pricing" class="btn btn-white">View Pricing</a>
+  <div class="hero-badge">🎉 5 free credits on signup — no card required</div>
+  <h1>Get <em>Pre-Qualified</em> AC Installation Leads</h1>
+  <p>Homeowners who've already calculated their BTU requirements and are ready to buy. Delivered instantly to your inbox.</p>
+  <div class="hero-buttons">
+    <a href="/company-portal.html" class="btn btn-primary">Join Free — Get 5 Credits →</a>
+    <a href="#pricing" class="btn btn-outline">View Pricing</a>
   </div>
 
   <div class="hero-stats">
     <div class="hero-stat">
-      <div class="hero-stat-value">£5</div>
-      <div class="hero-stat-label">Per Lead</div>
+      <div class="hero-stat-value">5</div>
+      <div class="hero-stat-label">Free Credits</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-value">20%</div>
+      <div class="hero-stat-label">Off First Purchase</div>
     </div>
     <div class="hero-stat">
       <div class="hero-stat-value">3</div>
-      <div class="hero-stat-label">Max Quotes</div>
+      <div class="hero-stat-label">Max Quotes Per Lead</div>
     </div>
     <div class="hero-stat">
-      <div class="hero-stat-value">15min</div>
-      <div class="hero-stat-label">Avg Response</div>
+      <div class="hero-stat-value">0</div>
+      <div class="hero-stat-label">Monthly Fees</div>
     </div>
   </div>
 </section>
 
 <!-- How It Works -->
-<section class="section">
+<section class="section" id="how-it-works">
   <h2 class="section-title">How It Works</h2>
-  <p class="section-subtitle">Four simple steps to start winning more AC installation jobs</p>
+  <p class="section-subtitle">Start receiving qualified leads in under 5 minutes</p>
 
   <div class="steps">
     <div class="step">
       <div class="step-number">1</div>
       <h3>Sign Up Free</h3>
-      <p>Register your HVAC company in 2 minutes. No credit card required.</p>
+      <p>Register your company in 2 minutes. Get 5 free credits — no card required.</p>
     </div>
     <div class="step">
       <div class="step-number">2</div>
-      <h3>Buy Credits</h3>
-      <p>Purchase lead credits. Only pay for leads you receive. No subscription.</p>
+      <h3>Set Your Area</h3>
+      <p>Tell us your postcode coverage. Only receive leads from areas you serve.</p>
     </div>
     <div class="step">
       <div class="step-number">3</div>
       <h3>Get Notified</h3>
-      <p>Receive instant email alerts when a homeowner in your area requests quotes.</p>
+      <p>Instant email alert when a homeowner in your area requests quotes.</p>
     </div>
     <div class="step">
       <div class="step-number">4</div>
       <h3>Win the Job</h3>
-      <p>Contact the customer within 15 minutes. Close the deal. Mark it won.</p>
+      <p>Contact the customer fast. Close the deal. Track everything in your dashboard.</p>
     </div>
   </div>
 </section>
 
 <!-- Benefits -->
-<section class="section" style="background:var(--bg);">
-  <h2 class="section-title">Why Join HVAC Lead Pro?</h2>
-  <p class="section-subtitle">Everything you need to grow your air conditioning business</p>
+<section class="section section-alt">
+  <div class="section">
+    <h2 class="section-title">Why ACConnx?</h2>
+    <p class="section-subtitle">Built by an AC company, for AC companies</p>
 
-  <div class="benefits">
-    <div class="benefit">
-      <div class="benefit-icon">🎯</div>
-      <div>
-        <h3>Pre-Qualified Leads</h3>
-        <p>Customers have already calculated their BTU requirements. They know what they need. No tyre-kickers.</p>
+    <div class="benefits">
+      <div class="benefit">
+        <div class="benefit-icon">🎯</div>
+        <div>
+          <h3>Pre-Qualified Leads</h3>
+          <p>Customers have already calculated their BTU. They know what they need — no time-wasters.</p>
+        </div>
       </div>
-    </div>
-    <div class="benefit">
-      <div class="benefit-icon">⚡</div>
-      <div>
-        <h3>Instant Delivery</h3>
-        <p>Leads arrive in real-time. Be the first to respond and win the job.</p>
+      <div class="benefit">
+        <div class="benefit-icon">⚡</div>
+        <div>
+          <h3>Instant Delivery</h3>
+          <p>Leads arrive in real-time via email. Be first to respond and win the job.</p>
+        </div>
       </div>
-    </div>
-    <div class="benefit">
-      <div class="benefit-icon">💰</div>
-      <div>
-        <h3>Pay Per Lead</h3>
-        <p>No monthly fees. No subscription. Buy credits and use them when you need leads.</p>
+      <div class="benefit">
+        <div class="benefit-icon">💰</div>
+        <div>
+          <h3>Pay Per Lead</h3>
+          <p>No subscriptions. No monthly fees. Buy credits when you need them.</p>
+        </div>
       </div>
-    </div>
-    <div class="benefit">
-      <div class="benefit-icon">📍</div>
-      <div>
-        <h3>Local Only</h3>
-        <p>Set your service area. Only receive leads from postcodes you actually serve.</p>
+      <div class="benefit">
+        <div class="benefit-icon">📍</div>
+        <div>
+          <h3>Local Only</h3>
+          <p>Set your postcode coverage. Only get leads from areas you actually serve.</p>
+        </div>
       </div>
-    </div>
-    <div class="benefit">
-      <div class="benefit-icon">📊</div>
-      <div>
-        <h3>Track Performance</h3>
-        <p>See your conversion rate, revenue won, and ROI in your dashboard.</p>
+      <div class="benefit">
+        <div class="benefit-icon">📊</div>
+        <div>
+          <h3>Track Everything</h3>
+          <p>See your leads, conversion rate, and ROI in your contractor dashboard.</p>
+        </div>
       </div>
-    </div>
-    <div class="benefit">
-      <div class="benefit-icon">🔒</div>
-      <div>
-        <h3>Fair Competition</h3>
-        <p>Max 3 quotes per lead. You're not competing with 10+ companies like on other platforms.</p>
+      <div class="benefit">
+        <div class="benefit-icon">🔒</div>
+        <div>
+          <h3>Fair Competition</h3>
+          <p>Max 3 contractors per lead. Not 10+ like other platforms.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -544,128 +729,114 @@
 <!-- Pricing -->
 <section class="section" id="pricing">
   <h2 class="section-title">Simple, Transparent Pricing</h2>
-  <p class="section-subtitle">No hidden fees. No subscription. Buy credits and use them anytime.</p>
+  <p class="section-subtitle">No hidden fees. No subscriptions. Credits never expire.</p>
+
+  <div class="pricing-note">
+    <span>🎉 20% off your first purchase — auto-applied at checkout</span>
+  </div>
 
   <div class="pricing-grid">
     <div class="pricing-card">
       <div class="pricing-name">Starter</div>
-      <div class="pricing-price">£25 <span>/ 5 leads</span></div>
+      <div class="pricing-price">£49.99</div>
+      <div class="pricing-per">5 leads — £10.00 per lead</div>
       <ul class="pricing-features">
         <li>5 qualified leads</li>
-        <li>£5.00 per lead</li>
-        <li>Email notifications</li>
-        <li>Basic lead details</li>
-        <li>Standard support</li>
+        <li>Instant email alerts</li>
+        <li>Full customer details</li>
+        <li>Postcode targeting</li>
+        <li>Lead dashboard</li>
       </ul>
-      <a href="company-portal.html" class="btn btn-secondary" style="width:100%;">Get Started</a>
+      <a href="/company-portal.html" class="btn btn-dark" style="width:100%;">Get Started</a>
     </div>
 
     <div class="pricing-card featured">
-      <div class="pricing-name">Professional</div>
-      <div class="pricing-price">£60 <span>/ 15 leads</span></div>
+      <div class="pricing-name">Growth</div>
+      <div class="pricing-price">£129.99</div>
+      <div class="pricing-per">15 leads — £8.67 per lead</div>
       <ul class="pricing-features">
         <li>15 qualified leads</li>
-        <li>£4.00 per lead (save 20%)</li>
-        <li>Instant SMS + email alerts</li>
+        <li>Instant email alerts</li>
         <li>Full customer details</li>
+        <li>Postcode targeting</li>
+        <li>Lead dashboard</li>
         <li>Priority matching</li>
-        <li>Priority support</li>
       </ul>
-      <a href="company-portal.html" class="btn btn-primary" style="width:100%;">Most Popular</a>
+      <a href="/company-portal.html" class="btn btn-primary" style="width:100%;">Most Popular</a>
     </div>
 
     <div class="pricing-card">
       <div class="pricing-name">Business</div>
-      <div class="pricing-price">£100 <span>/ 30 leads</span></div>
+      <div class="pricing-price">£199.99</div>
+      <div class="pricing-per">30 leads — £6.67 per lead</div>
       <ul class="pricing-features">
         <li>30 qualified leads</li>
-        <li>£3.33 per lead (save 33%)</li>
-        <li>Instant SMS + email alerts</li>
+        <li>Instant email alerts</li>
         <li>Full customer details</li>
+        <li>Postcode targeting</li>
+        <li>Lead dashboard</li>
         <li>Priority matching</li>
-        <li>Dedicated account manager</li>
       </ul>
-      <a href="company-portal.html" class="btn btn-secondary" style="width:100%;">Get Started</a>
-    </div>
-  </div>
-</section>
-
-<!-- Testimonials -->
-<section class="section" style="background:var(--bg);">
-  <h2 class="section-title">What Contractors Say</h2>
-  <p class="section-subtitle">Join hundreds of HVAC companies already winning more jobs</p>
-
-  <div class="testimonials">
-    <div class="testimonial">
-      <p class="testimonial-text">"I've tried Checkatrade and Rated People. HVAC Lead Pro gives me better quality leads at half the price. Customers actually know what they want."</p>
-      <div class="testimonial-author">Mark Thompson</div>
-      <div class="testimonial-company">Cool Air Solutions, Manchester</div>
-    </div>
-    <div class="testimonial">
-      <p class="testimonial-text">"Closed 4 jobs from my first 10 leads. The BTU calculator pre-qualifies customers so I'm not wasting time on enquiries that go nowhere."</p>
-      <div class="testimonial-author">Sarah Chen</div>
-      <div class="testimonial-company">Arctic Cooling, Birmingham</div>
-    </div>
-    <div class="testimonial">
-      <p class="testimonial-text">"Love the pay-per-lead model. No monthly commitment means I can scale up in summer and slow down in winter. Perfect for my business."</p>
-      <div class="testimonial-author">James Wilson</div>
-      <div class="testimonial-company">Wilson HVAC, London</div>
+      <a href="/company-portal.html" class="btn btn-dark" style="width:100%;">Get Started</a>
     </div>
   </div>
 </section>
 
 <!-- FAQ -->
-<section class="section">
-  <h2 class="section-title">Frequently Asked Questions</h2>
+<section class="section section-alt" id="faq">
+  <div class="section">
+    <h2 class="section-title">Frequently Asked Questions</h2>
+    <p class="section-subtitle">Everything you need to know</p>
 
-  <div class="faq-item active">
-    <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">How do I receive leads?</div>
-    <div class="faq-answer">You'll receive an instant email notification with the customer's contact details, BTU requirements, and location. You can also view all your leads in your dashboard.</div>
-  </div>
+    <div class="faq-list">
+      <div class="faq-item active">
+        <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">How do I receive leads?</div>
+        <div class="faq-answer">You'll get an instant email with the customer's name, contact details, BTU requirements, and postcode. You can also view all your leads in your contractor dashboard.</div>
+      </div>
 
-  <div class="faq-item">
-    <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">What areas do you cover?</div>
-    <div class="faq-answer">We currently cover all of the UK. When you register, you set your service area by postcode. You'll only receive leads from within that radius.</div>
-  </div>
+      <div class="faq-item">
+        <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">What areas do you cover?</div>
+        <div class="faq-answer">All of the UK. When you register, you set your service postcode. You'll only receive leads from your coverage area.</div>
+      </div>
 
-  <div class="faq-item">
-    <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">How many companies get the same lead?</div>
-    <div class="faq-answer">Maximum 3 companies per lead. This means less competition and higher conversion rates compared to other platforms that send leads to 10+ contractors.</div>
-  </div>
+      <div class="faq-item">
+        <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">How many companies get the same lead?</div>
+        <div class="faq-answer">Maximum 3. Less competition means higher conversion rates compared to platforms that send leads to 10+ contractors.</div>
+      </div>
 
-  <div class="faq-item">
-    <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">What if a lead is bad quality?</div>
-    <div class="faq-answer">We only charge for genuine enquiries. If a lead has incorrect contact details or is clearly not a real enquiry, contact us within 24 hours and we'll credit your account.</div>
-  </div>
+      <div class="faq-item">
+        <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">Do credits expire?</div>
+        <div class="faq-answer">No. Your credits never expire. Use them whenever you need leads — no time pressure.</div>
+      </div>
 
-  <div class="faq-item">
-    <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">Do credits expire?</div>
-    <div class="faq-answer">No, your credits never expire. Use them whenever you need leads. There's no time pressure.</div>
-  </div>
+      <div class="faq-item">
+        <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">What if a lead is bad quality?</div>
+        <div class="faq-answer">If a lead has incorrect contact details or isn't a genuine enquiry, contact us within 24 hours and we'll credit your account.</div>
+      </div>
 
-  <div class="faq-item">
-    <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">Can I cancel anytime?</div>
-    <div class="faq-answer">There's nothing to cancel! We don't have subscriptions. You simply buy credits as you need them. No commitment, no hassle.</div>
+      <div class="faq-item">
+        <div class="faq-question" onclick="this.parentElement.classList.toggle('active')">Can I cancel anytime?</div>
+        <div class="faq-answer">There's nothing to cancel. No subscriptions. You buy credits as you need them. That's it.</div>
+      </div>
+    </div>
   </div>
 </section>
 
 <!-- CTA -->
 <section class="cta">
-  <h2>Ready to Grow Your HVAC Business?</h2>
-  <p>Join hundreds of contractors getting qualified leads every day. Sign up free in 2 minutes.</p>
-  <a href="company-portal.html" class="btn btn-primary" style="font-size:1.25rem;padding:1.25rem 3rem;">Join Free Today →</a>
+  <h2>Ready to Win More Jobs?</h2>
+  <p>Sign up free in 2 minutes. Get 5 free credits. Start receiving qualified leads today.</p>
+  <a href="/company-portal.html" class="btn btn-primary" style="font-size:1.15rem;padding:1.15rem 3rem;">Join Free — Get 5 Credits →</a>
 </section>
 
 <!-- Footer -->
-<footer>
-  <div class="footer-links">
-    <a href="company-portal.html">Contractor Login</a>
-    <a href="admin.html">Admin</a>
-  </div>
-  <p>© 2024 ACConnx. All rights reserved.</p>
-  <p style="margin-top:0.5rem;opacity:0.7;">
-    <a href="/privacy.html" style="color: rgba(255,255,255,0.8); text-decoration: none; margin: 0 0.5rem;">Privacy</a>
-    <a href="/terms.html" style="color: rgba(255,255,255,0.8); text-decoration: none; margin: 0 0.5rem;">Terms</a>
+<footer class="footer">
+  <p>© 2026 ACConnx. All rights reserved.</p>
+  <p>
+    <a href="/">Calculator</a>
+    <a href="/company-portal.html">Contractor Login</a>
+    <a href="/privacy.html">Privacy Policy</a>
+    <a href="/terms.html">Terms of Service</a>
   </p>
 </footer>
 
