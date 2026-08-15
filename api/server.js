@@ -376,6 +376,20 @@ app.post('/api/confirm-payment', async (req, res) => {
 // ADMIN STATS
 // =====================
 app.get('/api/admin/stats', async (req, res) => {
+app.get('/api/admin/purchases', async (req, res) => {
+  try {
+    const { data: purchases, error } = await supabase
+      .from('purchases')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(purchases);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/stats', async (req, res) => {
   try {
     const { data: purchases } = await supabase.from('purchases').select('*');
     const { count: totalCompanies } = await supabase.from('companies').select('*', { count: 'exact', head: true });

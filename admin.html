@@ -3,51 +3,126 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HVAC Lead Pro — Admin Dashboard</title>
+  <title>ACConnx — Admin Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --primary: #0f4c81;
-      --primary-dark: #0a3356;
-      --accent: #00a896;
-      --accent-dark: #008c7a;
+      --primary: #0a2540;
+      --primary-light: #1a3a5c;
+      --accent: #00d4aa;
+      --accent-dark: #00b894;
+      --accent-light: rgba(0, 212, 170, 0.1);
       --warning: #f59e0b;
       --success: #10b981;
       --danger: #dc2626;
-      --text: #1f2937;
-      --text-light: #6b7280;
+      --text: #1e293b;
+      --text-light: #64748b;
       --bg: #f8fafc;
       --card: #ffffff;
       --border: #e2e8f0;
-      --shadow: 0 10px 40px rgba(15, 76, 129, 0.12);
-      --radius: 12px;
+      --shadow: 0 4px 24px rgba(10, 37, 64, 0.08);
+      --shadow-lg: 0 10px 40px rgba(10, 37, 64, 0.12);
+      --radius: 16px;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.6;
     }
 
     .nav {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      background: var(--primary);
       color: white;
       padding: 1rem 2rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
 
-    .nav-brand { font-size: 1.25rem; font-weight: 800; }
+    .nav-brand {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-brand span { color: var(--accent); }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+    }
+
+    .nav-links a {
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: white; }
 
     .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
 
+    .revenue-box {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      padding: 2.5rem;
+      border-radius: var(--radius);
+      text-align: center;
+      margin-bottom: 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .revenue-box::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(0,212,170,0.15) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    .revenue-box h2 {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+      position: relative;
+    }
+
+    .revenue-box .amount {
+      font-size: 3.5rem;
+      font-weight: 900;
+      color: var(--accent);
+      position: relative;
+    }
+
+    .revenue-box p {
+      opacity: 0.6;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      position: relative;
+    }
+
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
       margin-bottom: 2rem;
     }
 
@@ -58,13 +133,20 @@
       border: 1px solid var(--border);
       padding: 1.5rem;
       text-align: center;
+      transition: transform 0.2s, box-shadow 0.2s;
     }
 
-    .stat-value { font-size: 2.5rem; font-weight: 800; color: var(--primary); }
-    .stat-label { color: var(--text-light); font-size: 0.9rem; margin-top: 0.25rem; }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .stat-value { font-size: 2.25rem; font-weight: 800; color: var(--primary); }
+    .stat-label { color: var(--text-light); font-size: 0.85rem; margin-top: 0.25rem; font-weight: 500; }
     .stat-card.success .stat-value { color: var(--success); }
     .stat-card.warning .stat-value { color: var(--warning); }
     .stat-card.danger .stat-value { color: var(--danger); }
+    .stat-card.accent .stat-value { color: var(--accent-dark); }
 
     .card {
       background: var(--card);
@@ -76,12 +158,13 @@
     }
 
     .card h2 {
-      font-size: 1.25rem;
+      font-size: 1.1rem;
       color: var(--primary);
       margin-bottom: 1rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      font-weight: 700;
     }
 
     .tabs {
@@ -90,21 +173,24 @@
       margin-bottom: 1.5rem;
       border-bottom: 2px solid var(--border);
       padding-bottom: 0.5rem;
+      flex-wrap: wrap;
     }
 
     .tab {
-      padding: 0.5rem 1rem;
+      padding: 0.6rem 1.25rem;
       border: none;
       background: none;
       font-weight: 600;
       color: var(--text-light);
       cursor: pointer;
-      border-radius: 6px;
+      border-radius: 8px;
       transition: all 0.2s;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
     }
 
-    .tab:hover { color: var(--primary); }
-    .tab.active { color: var(--primary); background: var(--primary-light); }
+    .tab:hover { color: var(--primary); background: var(--bg); }
+    .tab.active { color: var(--primary); background: var(--accent-light); }
 
     .tab-content { display: none; }
     .tab-content.active { display: block; }
@@ -124,7 +210,7 @@
     th {
       font-weight: 700;
       color: var(--primary);
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
@@ -133,7 +219,7 @@
 
     .badge {
       display: inline-block;
-      padding: 0.2rem 0.6rem;
+      padding: 0.25rem 0.75rem;
       border-radius: 20px;
       font-size: 0.75rem;
       font-weight: 600;
@@ -143,35 +229,7 @@
     .badge-contacted { background: #fef3c7; color: #92400e; }
     .badge-won { background: #d1fae5; color: #065f46; }
     .badge-lost { background: #fee2e2; color: #991b1b; }
-    .badge-paid { background: #d1fae5; color: #065f46; }
-    .badge-pending { background: #fef3c7; color: #92400e; }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.5rem 1rem;
-      border: none;
-      border-radius: 6px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: white;
-    }
-
-    .btn-primary:hover { background: var(--accent-dark); }
-
-    .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
-
-    .btn-danger {
-      background: var(--danger);
-      color: white;
-    }
+    .badge-completed { background: #d1fae5; color: #065f46; }
 
     .search-box {
       padding: 0.5rem 1rem;
@@ -179,38 +237,19 @@
       border-radius: 8px;
       font-size: 0.9rem;
       width: 250px;
+      font-family: 'Inter', sans-serif;
+      transition: border-color 0.2s;
     }
 
     .search-box:focus {
       outline: none;
-      border-color: var(--primary);
+      border-color: var(--accent);
     }
 
     .empty-state {
       text-align: center;
       padding: 3rem;
       color: var(--text-light);
-    }
-
-    .revenue-box {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-      color: white;
-      padding: 2rem;
-      border-radius: var(--radius);
-      text-align: center;
-      margin-bottom: 2rem;
-    }
-
-    .revenue-box h2 {
-      color: white;
-      font-size: 1rem;
-      opacity: 0.8;
-      margin-bottom: 0.5rem;
-    }
-
-    .revenue-box .amount {
-      font-size: 3rem;
-      font-weight: 800;
     }
 
     .grid-2 {
@@ -222,6 +261,8 @@
     @media (max-width: 900px) {
       .grid-2 { grid-template-columns: 1fr; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .container { padding: 1rem; }
+      .revenue-box .amount { font-size: 2.5rem; }
     }
 
     .toast {
@@ -236,20 +277,40 @@
       transform: translateX(150%);
       transition: transform 0.3s ease;
       z-index: 2000;
+      font-family: 'Inter', sans-serif;
     }
 
     .toast.show { transform: translateX(0); }
     .toast.success { background: var(--success); }
     .toast.error { background: var(--danger); }
+
+    .refresh-btn {
+      background: var(--accent);
+      color: var(--primary);
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .refresh-btn:hover {
+      background: var(--accent-dark);
+      color: white;
+    }
   </style>
 </head>
 <body>
 
 <nav class="nav">
-  <div class="nav-brand">⚡ HVAC Lead Pro — Admin</div>
-  <div style="display:flex;gap:1rem;align-items:center;">
-    <a href="index.html" style="color:rgba(255,255,255,0.8);text-decoration:none;">← Back to Calculator</a>
-    <a href="company-portal.html" style="color:rgba(255,255,255,0.8);text-decoration:none;">Contractor Portal</a>
+  <div class="nav-brand">ACC<span>onn</span>X — Admin</div>
+  <div class="nav-links">
+    <a href="/">← Calculator</a>
+    <a href="/for-contractors">For Contractors</a>
+    <a href="/company-portal.html">Portal</a>
   </div>
 </nav>
 
@@ -259,7 +320,7 @@
   <div class="revenue-box">
     <h2>Total Revenue</h2>
     <div class="amount" id="totalRevenue">£0</div>
-    <p style="opacity:0.7;margin-top:0.5rem;">From all credit purchases</p>
+    <p>From all credit purchases</p>
   </div>
 
   <!-- Stats -->
@@ -268,11 +329,11 @@
       <div class="stat-value" id="statCompanies">0</div>
       <div class="stat-label">Registered Companies</div>
     </div>
-    <div class="stat-card success">
+    <div class="stat-card accent">
       <div class="stat-value" id="statLeads">0</div>
-      <div class="stat-label">Total Leads Generated</div>
+      <div class="stat-label">Total Leads</div>
     </div>
-    <div class="stat-card warning">
+    <div class="stat-card success">
       <div class="stat-value" id="statDistributed">0</div>
       <div class="stat-label">Leads Distributed</div>
     </div>
@@ -286,16 +347,16 @@
     </div>
     <div class="stat-card danger">
       <div class="stat-value" id="statPending">0</div>
-      <div class="stat-label">Undistributed Leads</div>
+      <div class="stat-label">Undistributed</div>
     </div>
   </div>
 
   <!-- Tabs -->
   <div class="tabs">
-    <button class="tab active" onclick="showTab('leads')">📋 All Leads</button>
-    <button class="tab" onclick="showTab('companies')">🏢 Companies</button>
-    <button class="tab" onclick="showTab('purchases')">💳 Purchases</button>
-    <button class="tab" onclick="showTab('analytics')">📊 Analytics</button>
+    <button class="tab active" onclick="showTab('leads', this)">📋 All Leads</button>
+    <button class="tab" onclick="showTab('companies', this)">🏢 Companies</button>
+    <button class="tab" onclick="showTab('purchases', this)">💳 Purchases</button>
+    <button class="tab" onclick="showTab('analytics', this)">📊 Analytics</button>
   </div>
 
   <!-- Leads Tab -->
@@ -303,7 +364,10 @@
     <div class="card">
       <h2>
         All Leads
-        <input type="text" class="search-box" id="leadSearch" placeholder="Search leads..." onkeyup="renderLeads()">
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <input type="text" class="search-box" id="leadSearch" placeholder="Search leads..." onkeyup="renderLeads()">
+          <button class="refresh-btn" onclick="init()">↻ Refresh</button>
+        </div>
       </h2>
       <div style="overflow-x:auto;">
         <table>
@@ -342,6 +406,7 @@
               <th>Email</th>
               <th>Phone</th>
               <th>Area</th>
+              <th>F-Gas</th>
               <th>Credits</th>
               <th>Leads</th>
               <th>Joined</th>
@@ -369,6 +434,7 @@
               <th>Package</th>
               <th>Credits</th>
               <th>Amount</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody id="purchasesTable"></tbody>
@@ -411,7 +477,14 @@ const API_BASE = window.location.hostname === 'localhost'
   : 'https://acconnx.com/api';
 
 // =====================
-// DATA ACCESS — API
+// DATA CACHE
+// =====================
+let cachedCompanies = [];
+let cachedLeads = [];
+let cachedPurchases = [];
+
+// =====================
+// DATA ACCESS
 // =====================
 async function fetchAPI(endpoint, options = {}) {
   try {
@@ -428,46 +501,41 @@ async function fetchAPI(endpoint, options = {}) {
   }
 }
 
-async function getCompanies() {
-  return await fetchAPI('/companies') || [];
-}
-
-async function getLeads() {
-  return await fetchAPI('/leads') || [];
-}
-
-async function getPurchases() {
-  // Note: purchases endpoint not in API yet, using admin stats
-  return [];
-}
-
-async function getAdminStats() {
-  return await fetchAPI('/admin/stats') || {};
+async function loadAllData() {
+  const [companies, leads, purchases] = await Promise.all([
+    fetchAPI('/companies'),
+    fetchAPI('/leads'),
+    fetchAPI('/admin/purchases')
+  ]);
+  cachedCompanies = companies || [];
+  cachedLeads = leads || [];
+  cachedPurchases = purchases || [];
 }
 
 // =====================
 // STATS
 // =====================
 async function loadStats() {
-  const stats = await getAdminStats();
+  const stats = await fetchAPI('/admin/stats');
+  if (!stats) return;
   
   document.getElementById('statCompanies').textContent = stats.totalCompanies || 0;
-  document.getElementById('statLeads').textContent = stats.totalLeads || 0;
+  document.getElementById('statLeads').textContent = (stats.totalLeads || 0) + (stats.distributedLeads || 0);
   document.getElementById('statDistributed').textContent = stats.distributedLeads || 0;
   document.getElementById('statCredits').textContent = stats.totalCredits || 0;
   document.getElementById('statConversion').textContent = (stats.conversionRate || 0) + '%';
-  document.getElementById('statPending').textContent = (stats.totalLeads - stats.distributedLeads) || 0;
+  document.getElementById('statPending').textContent = stats.totalLeads || 0;
   document.getElementById('totalRevenue').textContent = '£' + (stats.totalRevenue || '0');
 }
 
 // =====================
 // TABS
 // =====================
-function showTab(tab) {
+function showTab(tab, el) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
 
-  event.target.classList.add('active');
+  el.classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
 
   if (tab === 'leads') renderLeads();
@@ -479,17 +547,16 @@ function showTab(tab) {
 // =====================
 // RENDER LEADS
 // =====================
-async function renderLeads() {
-  const search = document.getElementById('leadSearch').value.toLowerCase();
-  const leads = await getLeads();
-  const companies = await getCompanies();
+function renderLeads() {
+  const search = (document.getElementById('leadSearch').value || '').toLowerCase();
+  const leads = cachedLeads;
 
   let filtered = leads;
   if (search) {
     filtered = leads.filter(l =>
-      (l.customerName || '').toLowerCase().includes(search) ||
+      (l.customer_name || '').toLowerCase().includes(search) ||
       (l.postcode || '').toLowerCase().includes(search) ||
-      (l.customerEmail || '').toLowerCase().includes(search)
+      (l.customer_email || '').toLowerCase().includes(search)
     );
   }
 
@@ -504,13 +571,13 @@ async function renderLeads() {
 
   empty.style.display = 'none';
   tbody.innerHTML = filtered.slice().reverse().map(lead => {
-    const company = companies.find(c => c._id === lead.companyId);
+    const company = cachedCompanies.find(c => c.id === lead.assigned_to);
     return `
       <tr>
-        <td>${formatDate(lead.createdAt)}</td>
+        <td>${formatDate(lead.created_at)}</td>
         <td>
-          <strong>${lead.customerName || 'Unknown'}</strong>
-          <div style="font-size:0.8rem;color:var(--text-light);">${lead.customerEmail || ''}</div>
+          <strong>${lead.customer_name || 'Unknown'}</strong>
+          <div style="font-size:0.8rem;color:var(--text-light);">${lead.customer_email || ''}</div>
         </td>
         <td>${lead.postcode || '—'}</td>
         <td>${lead.btu ? lead.btu.toLocaleString() : '—'}</td>
@@ -524,10 +591,10 @@ async function renderLeads() {
 // =====================
 // RENDER COMPANIES
 // =====================
-async function renderCompanies() {
-  const search = document.getElementById('companySearch').value.toLowerCase();
-  const companies = await getCompanies();
-  const leads = await getLeads();
+function renderCompanies() {
+  const search = (document.getElementById('companySearch').value || '').toLowerCase();
+  const companies = cachedCompanies;
+  const leads = cachedLeads;
 
   let filtered = companies;
   if (search) {
@@ -549,17 +616,18 @@ async function renderCompanies() {
 
   empty.style.display = 'none';
   tbody.innerHTML = filtered.map(company => {
-    const companyLeads = leads.filter(l => l.companyId === company._id);
+    const companyLeads = leads.filter(l => l.assigned_to === company.id);
     return `
       <tr>
         <td><strong>${company.company}</strong></td>
         <td>${company.name}</td>
         <td>${company.email}</td>
-        <td>${company.phone}</td>
+        <td>${company.phone || '—'}</td>
         <td>${company.postcode}</td>
+        <td>${company.fgas_number || '<span style="color:var(--text-light);">—</span>'}</td>
         <td><strong>${company.credits || 0}</strong></td>
         <td>${companyLeads.length}</td>
-        <td>${formatDate(company.createdAt)}</td>
+        <td>${formatDate(company.created_at)}</td>
       </tr>
     `;
   }).join('');
@@ -568,9 +636,8 @@ async function renderCompanies() {
 // =====================
 // RENDER PURCHASES
 // =====================
-async function renderPurchases() {
-  const purchases = await getPurchases();
-  const companies = await getCompanies();
+function renderPurchases() {
+  const purchases = cachedPurchases;
   const tbody = document.getElementById('purchasesTable');
   const empty = document.getElementById('purchasesEmpty');
 
@@ -582,14 +649,15 @@ async function renderPurchases() {
 
   empty.style.display = 'none';
   tbody.innerHTML = purchases.slice().reverse().map(p => {
-    const company = companies.find(c => c._id === p.companyId);
+    const company = cachedCompanies.find(c => c.id === p.company_id);
     return `
       <tr>
-        <td>${formatDate(p.createdAt)}</td>
+        <td>${formatDate(p.created_at)}</td>
         <td>${company ? company.company : 'Unknown'}</td>
-        <td>${p.package}</td>
+        <td>${p.package_name || '—'}</td>
         <td>${p.credits}</td>
-        <td><strong>${p.amount}</strong></td>
+        <td><strong>£${parseFloat(p.amount || 0).toFixed(2)}</strong></td>
+        <td><span class="badge badge-${p.status || 'completed'}">${p.status || 'completed'}</span></td>
       </tr>
     `;
   }).join('');
@@ -598,9 +666,9 @@ async function renderPurchases() {
 // =====================
 // RENDER ANALYTICS
 // =====================
-async function renderAnalytics() {
-  const leads = (await getLeads()).filter(l => l.companyId);
-  const companies = await getCompanies();
+function renderAnalytics() {
+  const leads = cachedLeads.filter(l => l.assigned_to);
+  const companies = cachedCompanies;
 
   // Status breakdown
   const statuses = {};
@@ -614,15 +682,18 @@ async function renderAnalytics() {
   const statusTextColors = { new: '#1e40af', contacted: '#92400e', won: '#065f46', lost: '#991b1b' };
 
   let statusHtml = '<div style="display:flex;flex-direction:column;gap:0.75rem;">';
+  if (Object.keys(statuses).length === 0) {
+    statusHtml += '<p style="color:var(--text-light);">No distributed leads yet.</p>';
+  }
   Object.entries(statuses).forEach(([status, count]) => {
-    const pct = Math.round((count / leads.length) * 100);
+    const pct = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
     statusHtml += `
       <div style="display:flex;align-items:center;gap:1rem;">
-        <span class="badge" style="background:${statusColors[status]};color:${statusTextColors[status]};min-width:80px;text-align:center;">${statusLabels[status]}</span>
+        <span class="badge" style="background:${statusColors[status] || '#e2e8f0'};color:${statusTextColors[status] || '#64748b'};min-width:80px;text-align:center;">${statusLabels[status] || status}</span>
         <div style="flex:1;background:var(--bg);border-radius:8px;height:24px;overflow:hidden;">
-          <div style="width:${pct}%;background:${statusTextColors[status]};height:100%;border-radius:8px;transition:width 0.5s;"></div>
+          <div style="width:${pct}%;background:${statusTextColors[status] || '#64748b'};height:100%;border-radius:8px;transition:width 0.5s;"></div>
         </div>
-        <span style="font-weight:700;min-width:60px;text-align:right;">${count}</span>
+        <span style="font-weight:700;min-width:60px;text-align:right;">${count} (${pct}%)</span>
       </div>
     `;
   });
@@ -631,21 +702,25 @@ async function renderAnalytics() {
 
   // Top companies
   const companyStats = companies.map(c => {
-    const companyLeads = leads.filter(l => l.companyId === c.id);
+    const companyLeads = leads.filter(l => l.assigned_to === c.id);
     const won = companyLeads.filter(l => l.status === 'won').length;
     return { ...c, leadCount: companyLeads.length, wonCount: won };
   }).sort((a, b) => b.leadCount - a.leadCount).slice(0, 5);
 
   let topHtml = '<div style="display:flex;flex-direction:column;gap:0.75rem;">';
+  if (companyStats.length === 0) {
+    topHtml += '<p style="color:var(--text-light);">No companies yet.</p>';
+  }
   companyStats.forEach((c, i) => {
+    const convRate = c.leadCount > 0 ? Math.round((c.wonCount / c.leadCount) * 100) : 0;
     topHtml += `
       <div style="display:flex;align-items:center;gap:1rem;padding:0.75rem;background:var(--bg);border-radius:8px;">
-        <span style="font-weight:800;color:var(--primary);min-width:24px;">${i + 1}</span>
+        <span style="font-weight:800;color:var(--accent-dark);min-width:24px;">#${i + 1}</span>
         <div style="flex:1;">
           <strong>${c.company}</strong>
           <div style="font-size:0.8rem;color:var(--text-light);">${c.leadCount} leads • ${c.wonCount} won</div>
         </div>
-        <span style="font-weight:700;color:var(--success);">${Math.round((c.wonCount / Math.max(c.leadCount, 1)) * 100)}%</span>
+        <span style="font-weight:700;color:var(--success);">${convRate}%</span>
       </div>
     `;
   });
@@ -653,15 +728,18 @@ async function renderAnalytics() {
   document.getElementById('topCompanies').innerHTML = topHtml;
 
   // Activity log
-  const allLeads = (await getLeads()).slice().reverse().slice(0, 10);
+  const allLeads = cachedLeads.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 10);
   let activityHtml = '<div style="display:flex;flex-direction:column;gap:0.5rem;">';
+  if (allLeads.length === 0) {
+    activityHtml += '<p style="color:var(--text-light);">No activity yet.</p>';
+  }
   allLeads.forEach(l => {
-    const company = companies.find(c => c.id === l.companyId);
+    const company = cachedCompanies.find(c => c.id === l.assigned_to);
     activityHtml += `
       <div style="padding:0.75rem;background:var(--bg);border-radius:8px;font-size:0.9rem;">
-        <strong>${l.customerName || 'Lead'}</strong> from ${l.postcode || 'unknown'}
+        <strong>${l.customer_name || 'Lead'}</strong> from ${l.postcode || 'unknown'}
         ${company ? `→ assigned to <strong>${company.company}</strong>` : '→ <span style="color:var(--warning);">unassigned</span>'}
-        <span style="color:var(--text-light);float:right;">${formatDate(l.createdAt)}</span>
+        <span style="color:var(--text-light);float:right;">${formatDate(l.created_at)}</span>
       </div>
     `;
   });
@@ -690,8 +768,9 @@ function showToast(message, type) {
 // INIT
 // =====================
 async function init() {
+  await loadAllData();
   await loadStats();
-  await renderLeads();
+  renderLeads();
 }
 
 init();
