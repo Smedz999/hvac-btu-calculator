@@ -87,7 +87,7 @@ app.get('/api/health', async (req, res) => {
 // =====================
 app.post('/api/companies/register', async (req, res) => {
   try {
-    const { company, name, email, phone, password, postcode, radius } = req.body;
+    const { company, name, email, phone, password, postcode, radius, fgas_number } = req.body;
 
     if (!company || !name || !email || !phone || !password || !postcode) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -117,7 +117,8 @@ app.post('/api/companies/register', async (req, res) => {
         password: hashedPassword,
         postcode: postcode.toUpperCase(),
         radius: radius || 25,
-        credits: 5
+        credits: 5,
+        fgas_number: fgas_number || null
       })
       .select()
       .single();

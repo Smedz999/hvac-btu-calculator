@@ -396,6 +396,14 @@
           <input type="number" id="regRadius" value="25" min="5" max="100" />
         </div>
       </div>
+      <div class="form-group">
+        <label>F-Gas Certificate Number</label>
+        <input type="text" id="regFgas" placeholder="e.g. FG12345678" />
+      </div>
+      <div class="form-group" style="display:flex;align-items:flex-start;gap:0.5rem;">
+        <input type="checkbox" id="regFgasConfirm" style="margin-top:0.25rem;width:auto;" />
+        <label for="regFgasConfirm" style="font-size:0.85rem;font-weight:400;color:var(--text-light);">I confirm that my company holds a valid F-Gas certificate as required by UK law for handling fluorinated greenhouse gases.</label>
+      </div>
       <button class="btn btn-primary" style="width:100%" onclick="register()">Create Account</button>
       <div class="auth-toggle">
         Already have an account? <a onclick="toggleAuth('login')">Login</a>
@@ -699,6 +707,8 @@ async function register() {
   const password = document.getElementById('regPassword').value;
   const postcode = document.getElementById('regPostcode').value.trim().toUpperCase();
   const radius = parseInt(document.getElementById('regRadius').value) || 25;
+  const fgasNumber = document.getElementById('regFgas').value.trim();
+  const fgasConfirmed = document.getElementById('regFgasConfirm').checked;
 
   if (!company || !name || !email || !phone || !password || !postcode) {
     showToast('Please fill in all required fields', 'error');
@@ -710,11 +720,16 @@ async function register() {
     return;
   }
 
+  if (!fgasConfirmed) {
+    showToast('Please confirm you hold a valid F-Gas certificate', 'error');
+    return;
+  }
+
   try {
     const res = await fetch(`${API_URL}/companies/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ company, name, email, phone, password, postcode, radius })
+      body: JSON.stringify({ company, name, email, phone, password, postcode, radius, fgas_number: fgasNumber })
     });
 
     const data = await res.json();
