@@ -76,6 +76,79 @@
       font-weight: 600;
     }
 
+    /* Hamburger menu */
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      padding: 0.5rem;
+      background: none;
+      border: none;
+    }
+
+    .hamburger span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      background: white;
+      border-radius: 2px;
+      transition: all 0.3s;
+    }
+
+    .hamburger.open span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+    .hamburger.open span:nth-child(2) { opacity: 0; }
+    .hamburger.open span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+    .mobile-menu {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--primary);
+      z-index: 999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+    }
+
+    .mobile-menu.open { display: flex; }
+
+    .mobile-menu a {
+      color: white;
+      text-decoration: none;
+      font-size: 1.25rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0.75rem 2rem;
+      border-radius: 8px;
+      transition: background 0.2s;
+    }
+
+    .mobile-menu a:hover, .mobile-menu a.active {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .mobile-menu .nav-credits {
+      font-size: 1.1rem;
+      margin-top: 1rem;
+    }
+
+    .mobile-menu-close {
+      position: absolute;
+      top: 1rem;
+      right: 1.5rem;
+      background: none;
+      border: none;
+      color: white;
+      font-size: 2rem;
+      cursor: pointer;
+      padding: 0.5rem;
+    }
+
     .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
     .page { display: none; }
     .page.active { display: block; }
@@ -161,9 +234,17 @@
 
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 
-    @media (max-width: 600px) {
+    @media (max-width: 768px) {
       .row { grid-template-columns: 1fr; }
       .nav-links { display: none; }
+      .hamburger { display: flex; }
+      .container { padding: 1rem; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .stat-value { font-size: 1.75rem; }
+      .card { padding: 1.25rem; }
+      .lead-detail-grid { grid-template-columns: 1fr; }
+      .pricing-grid { grid-template-columns: 1fr; }
+      .pricing-card.featured { transform: none; }
     }
 
     .pricing-grid {
@@ -320,7 +401,23 @@
     <a onclick="logout()">Logout</a>
     <span class="nav-credits" id="navCreditCount">0 credits</span>
   </div>
+  <button class="hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
 </nav>
+
+<!-- Mobile Menu Overlay -->
+<div class="mobile-menu" id="mobileMenu">
+  <button class="mobile-menu-close" onclick="toggleMobileMenu()">&times;</button>
+  <a onclick="showPage('dashboard'); toggleMobileMenu();" id="mobile-nav-dashboard">Dashboard</a>
+  <a onclick="showPage('leads'); toggleMobileMenu();" id="mobile-nav-leads">My Leads</a>
+  <a onclick="showPage('buy'); toggleMobileMenu();" id="mobile-nav-buy">Buy Credits</a>
+  <a onclick="showPage('profile'); toggleMobileMenu();" id="mobile-nav-profile">Profile</a>
+  <a onclick="logout(); toggleMobileMenu();">Logout</a>
+  <span class="nav-credits" id="mobileNavCreditCount">0 credits</span>
+</div>
 
 <!-- AUTH PAGE -->
 <div class="page active" id="page-auth">
@@ -1329,7 +1426,17 @@ function updateCurrentUser() {
 
 function updateNavCredits() {
   const credits = currentUser ? (currentUser.credits || 0) : 0;
-  document.getElementById('navCreditCount').textContent = credits + ' credit' + (credits !== 1 ? 's' : '');
+  const text = credits + ' credit' + (credits !== 1 ? 's' : '');
+  document.getElementById('navCreditCount').textContent = text;
+  const mobileCredits = document.getElementById('mobileNavCreditCount');
+  if (mobileCredits) mobileCredits.textContent = text;
+}
+
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const btn = document.getElementById('hamburgerBtn');
+  menu.classList.toggle('open');
+  btn.classList.toggle('open');
 }
 
 // =====================
