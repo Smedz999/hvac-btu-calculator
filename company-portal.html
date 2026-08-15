@@ -617,12 +617,6 @@
           <span style="flex:1;">Email me when new leads arrive</span>
         </label>
       </div>
-      <div class="form-group">
-        <label style="display:flex;align-items:center;gap:0.75rem;cursor:pointer;font-weight:500;">
-          <input type="checkbox" id="notifySMS" style="width:auto;flex-shrink:0;" /> 
-          <span style="flex:1;">SMS me when new leads arrive</span>
-        </label>
-      </div>
       <button class="btn btn-primary" onclick="updateNotifications()">Save Settings</button>
     </div>
   </div>
@@ -761,8 +755,7 @@ async function register() {
       credits: 5, // 5 free credits for new accounts
       hasPurchased: false, // Track if they've made first purchase
       createdAt: new Date().toISOString(),
-      notifyEmail: true,
-      notifySMS: false
+      notifyEmail: true
     };
 
     companies.push(companyData);
@@ -1246,7 +1239,6 @@ function loadProfile() {
   document.getElementById('profileRadius').value = currentUser.radius || 25;
   document.getElementById('profileFgas').value = currentUser.fgas_number || '';
   document.getElementById('notifyEmail').checked = currentUser.notifyEmail !== false;
-  document.getElementById('notifySMS').checked = currentUser.notifySMS === true;
 }
 
 async function updateProfile() {
@@ -1289,7 +1281,6 @@ async function updateProfile() {
 
 function updateNotifications() {
   currentUser.notifyEmail = document.getElementById('notifyEmail').checked;
-  currentUser.notifySMS = document.getElementById('notifySMS').checked;
 
   updateCurrentUser();
   showToast('Notification settings saved');
