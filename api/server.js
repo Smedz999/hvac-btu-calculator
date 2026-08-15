@@ -172,6 +172,103 @@ app.post('/api/companies/login', async (req, res) => {
   }
 });
 
+// =====================
+// PASSWORD RESET (in-memory store)
+// =====================
+const resetCodes = new Map(); // email -> { code, expires }
+
+app.post('/api/companies/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    // Always return success (security best practice)
+    const { data: company } = await supabase
+      .from('companies')
+      .select('id, email')
+      .eq('email', email)
+      .single();
+
+    if (company) {
+      // Generate 6-digit code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const expires = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+      resetCodes.set(email.toLowerCase(), { code, expires });
+
+      // Send email via Resend
+      if (resend) {
+        try {
+          await resend.emails.send({
+            from: 'ACConnx <noreply@acconnx.com>',
+            to: email,
+            subject: 'Password Reset Code — ACConnx',
+            html: `<h1>Password Reset</h1><p>Your password reset code is:</p><h2 style="font-size:2rem;letter-spacing:0.3em;color:#0a2540;">${code}</h2><p>This code expires in 15 minutes.</p><p>If you didn't request this, you can ignore this email.</p>`
+          });
+        } catch (e) {
+          console.log('Failed to send reset email:', e.message);
+        }
+      }
+    }
+
+    // Always return success regardless of whether email exists
+    res.json({ success: true, message: 'If an account exists, a reset code has been sent.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/companies/reset-password', async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ error: 'Email, code, and new password are required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const stored = resetCodes.get(email.toLowerCase());
+
+    if (!stored) {
+      return res.status(400).json({ error: 'No reset code found. Please request a new one.' });
+    }
+
+    if (Date.now() > stored.expires) {
+      resetCodes.delete(email.toLowerCase());
+      return res.status(400).json({ error: 'Reset code has expired. Please request a new one.' });
+    }
+
+    if (stored.code !== code) {
+      return res.status(400).json({ error: 'Invalid reset code.' });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update company password
+    const { data: company, error } = await supabase
+      .from('companies')
+      .update({ password: hashedPassword, updated_at: new Date().toISOString() })
+      .eq('email', email)
+      .select('id, company, name, email')
+      .single();
+
+    if (error || !company) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    // Clear the used code
+    resetCodes.delete(email.toLowerCase());
+
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/companies', async (req, res) => {
   try {
     const { data: companies, error } = await supabase

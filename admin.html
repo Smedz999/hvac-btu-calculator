@@ -301,9 +301,115 @@
       background: var(--accent-dark);
       color: white;
     }
+
+    /* Login Gate */
+    .login-gate {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 9999;
+    }
+
+    .login-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .login-card h1 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--primary);
+      letter-spacing: -0.02em;
+      margin-bottom: 0.25rem;
+    }
+
+    .login-card h1 span { color: var(--accent); }
+
+    .login-card p {
+      color: var(--text-light);
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .login-card input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      font-family: 'Inter', sans-serif;
+      margin-bottom: 1rem;
+      transition: border-color 0.2s;
+    }
+
+    .login-card input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.1);
+    }
+
+    .login-card button {
+      width: 100%;
+      padding: 0.75rem;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .login-card button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0, 168, 150, 0.35);
+    }
+
+    .login-error {
+      color: var(--danger);
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+      display: none;
+    }
+
+    #adminContent { display: none; }
   </style>
+  <!-- Google Analytics GA4 — Replace G-XXXXXXXXXX with your measurement ID -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag("js", new Date());
+    gtag("config", "G-XXXXXXXXXX");
+  </script>
 </head>
 <body>
+
+<!-- Login Gate -->
+<div class="login-gate" id="loginGate">
+  <div class="login-card">
+    <h1>ACC<span>onn</span>X</h1>
+    <p>Admin Dashboard — Enter password to continue</p>
+    <form onsubmit="return attemptLogin(event)">
+      <input type="password" id="adminPassword" placeholder="Enter admin password" autocomplete="current-password" autofocus />
+      <button type="submit">Access Dashboard</button>
+    </form>
+    <div class="login-error" id="loginError">Incorrect password. Please try again.</div>
+  </div>
+</div>
+
+<div id="adminContent">
 
 <nav class="nav">
   <div class="nav-brand">ACC<span>onn</span>X — Admin</div>
@@ -467,6 +573,39 @@
 </div>
 
 <div class="toast" id="toast"></div>
+</div><!-- /adminContent -->
+
+<script>
+// =====================
+// ADMIN AUTH
+// =====================
+const ADMIN_PASSWORD = 'acconnx2026';
+
+function attemptLogin(e) {
+  e.preventDefault();
+  const input = document.getElementById('adminPassword').value;
+  if (input === ADMIN_PASSWORD) {
+    sessionStorage.setItem('acconnx_admin_auth', 'true');
+    showAdmin();
+  } else {
+    document.getElementById('loginError').style.display = 'block';
+    document.getElementById('adminPassword').value = '';
+    document.getElementById('adminPassword').focus();
+  }
+  return false;
+}
+
+function showAdmin() {
+  document.getElementById('loginGate').style.display = 'none';
+  document.getElementById('adminContent').style.display = 'block';
+  init();
+}
+
+// Check existing session
+if (sessionStorage.getItem('acconnx_admin_auth') === 'true') {
+  showAdmin();
+}
+</script>
 
 <script>
 // =====================
@@ -772,8 +911,6 @@ async function init() {
   await loadStats();
   renderLeads();
 }
-
-init();
 </script>
 
 </body>

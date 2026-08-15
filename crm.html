@@ -254,6 +254,14 @@
     .toast.show { transform: translateX(0); }
     .toast.success { background: var(--success); }
   </style>
+  <!-- Google Analytics GA4 — Replace G-XXXXXXXXXX with your measurement ID -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag("js", new Date());
+    gtag("config", "G-XXXXXXXXXX");
+  </script>
 </head>
 <body>
 
@@ -456,44 +464,36 @@ async function getProspects() {
   return await fetchAPI('/prospects') || [];
 }
 
-async function saveProspect(prospectData) {
-  return await fetchAPI('/prospects', {
-    method: 'POST',
-    body: JSON.stringify(prospectData)
-  });
-}
-
-async function updateProspect(id, updates) {
-  return await fetchAPI(`/prospects/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(updates)
-  });
-}
-
-async function deleteProspect(id) {
-  return await fetchAPI(`/prospects/${id}`, { method: 'DELETE' });
-}
-
 async function getTasks() {
   return await fetchAPI('/tasks') || [];
 }
 
-async function saveTask(taskData) {
-  return await fetchAPI('/tasks', {
+async function saveProspect() {
+  const prospect = {
+    company: document.getElementById('addCompany').value.trim(),
+    name: document.getElementById('addName').value.trim(),
+    email: document.getElementById('addEmail').value.trim(),
+    phone: document.getElementById('addPhone').value.trim(),
+    city: document.getElementById('addCity').value.trim(),
+    postcode: document.getElementById('addPostcode').value.trim(),
+    status: document.getElementById('addStatus').value,
+    notes: document.getElementById('addNotes').value.trim()
+  };
+
+  if (!prospect.company || !prospect.email) {
+    showToast('Company name and email are required', 'error');
+    return;
+  }
+
+  const result = await fetchAPI('/prospects', {
     method: 'POST',
-    body: JSON.stringify(taskData)
+    body: JSON.stringify(prospect)
   });
-}
-
-async function updateTask(id, updates) {
-  return await fetchAPI(`/tasks/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(updates)
-  });
-}
-
-async function deleteTask(id) {
-  return await fetchAPI(`/tasks/${id}`, { method: 'DELETE' });
+  if (result) {
+    closeAddModal();
+    renderProspects();
+    showToast('Prospect added');
+  }
 }
 
 // =====================
@@ -542,15 +542,15 @@ async function renderProspects() {
   tbody.innerHTML = prospects.map(p => `
     <tr>
       <td><strong>${p.company}</strong></td>
-      <td>${p.name}</td>
+      <td>${p.contact || p.name || '—'}</td>
       <td><a href="mailto:${p.email}">${p.email}</a></td>
       <td>${p.phone || '—'}</td>
       <td>${p.city || '—'}</td>
       <td><span class="badge badge-${p.status}">${p.status}</span></td>
-      <td>${p.lastContact ? formatDate(p.lastContact) : 'Never'}</td>
+      <td>${p.last_contact ? formatDate(p.last_contact) : 'Never'}</td>
       <td>
-        <button class="btn btn-sm btn-primary" onclick="editStatus('${p._id}')">Update</button>
-        <button class="btn btn-sm" onclick="addFollowUpTask('${p._id}')">Task</button>
+        <button class="btn btn-sm btn-primary" onclick="editStatus('${p.id}')">Update</button>
+        <button class="btn btn-sm" onclick="addFollowUpTask('${p.id}')">Task</button>
       </td>
     </tr>
   `).join('');
@@ -573,40 +573,18 @@ function closeAddModal() {
   document.getElementById('addNotes').value = '';
 }
 
-async function saveProspect() {
-  const prospect = {
-    company: document.getElementById('addCompany').value.trim(),
-    name: document.getElementById('addName').value.trim(),
-    email: document.getElementById('addEmail').value.trim(),
-    phone: document.getElementById('addPhone').value.trim(),
-    city: document.getElementById('addCity').value.trim(),
-    postcode: document.getElementById('addPostcode').value.trim(),
-    status: document.getElementById('addStatus').value,
-    notes: document.getElementById('addNotes').value.trim()
-  };
-
-  if (!prospect.company || !prospect.email) {
-    showToast('Company name and email are required', 'error');
-    return;
-  }
-
-  const result = await saveProspect(prospect);
-  if (result) {
-    closeAddModal();
-    renderProspects();
-    showToast('Prospect added');
-  }
-}
-
 async function editStatus(id) {
   const prospects = await getProspects();
-  const p = prospects.find(x => x._id === id);
+  const p = prospects.find(x => x.id === id);
   if (!p) return;
 
   const newStatus = prompt(`Update status for ${p.company}:\n\nnew, contacted, interested, registered, customer`, p.status);
   if (!newStatus) return;
 
-  const result = await updateProspect(id, { status: newStatus });
+  const result = await fetchAPI(`/prospects/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ status: newStatus })
+  });
   if (result) {
     renderProspects();
     showToast('Status updated');
@@ -615,17 +593,20 @@ async function editStatus(id) {
 
 async function addFollowUpTask(prospectId) {
   const prospects = await getProspects();
-  const p = prospects.find(x => x._id === prospectId);
+  const p = prospects.find(x => x.id === prospectId);
   if (!p) return;
 
   const taskText = prompt(`Follow-up task for ${p.company}:`);
   if (!taskText) return;
 
-  const result = await saveTask({
-    prospectId,
-    company: p.company,
-    text: taskText,
-    dueDate: new Date(Date.now() + 86400000 * 3).toISOString()
+  const result = await fetchAPI('/tasks', {
+    method: 'POST',
+    body: JSON.stringify({
+      title: taskText,
+      description: `Follow up with ${p.company}`,
+      dueDate: new Date(Date.now() + 86400000 * 3).toISOString(),
+      prospectId
+    })
   });
 
   if (result) {
@@ -647,7 +628,7 @@ async function renderPipeline() {
     container.innerHTML = filtered.map(p => `
       <div style="background:white;padding:0.75rem;border-radius:6px;margin-bottom:0.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
         <strong style="font-size:0.85rem;">${p.company}</strong>
-        <div style="font-size:0.75rem;color:var(--text-light);">${p.city || ''} • ${p.name}</div>
+        <div style="font-size:0.75rem;color:var(--text-light);">${p.city || ''} • ${p.contact || p.name || ''}</div>
       </div>
     `).join('') || '<div style="color:var(--text-light);font-size:0.85rem;text-align:center;padding:1rem;">None</div>';
   });
@@ -668,24 +649,26 @@ async function renderTasks() {
   container.innerHTML = tasks.map(t => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem;background:var(--bg);border-radius:8px;margin-bottom:0.5rem;">
       <div>
-        <strong>${t.company || 'General'}</strong> — ${t.text}
-        <div style="font-size:0.8rem;color:var(--text-light);">Due: ${formatDate(t.dueDate)}</div>
+        <strong>${t.title || 'Task'}</strong>${t.description ? ' — ' + t.description : ''}
+        <div style="font-size:0.8rem;color:var(--text-light);">Due: ${formatDate(t.due_date)}</div>
       </div>
-      <button class="btn btn-sm btn-success" onclick="completeTask('${t._id}')">Done</button>
+      <button class="btn btn-sm btn-success" onclick="completeTask('${t.id}')">Done</button>
     </div>
   `).join('');
 }
 
 async function addTask() {
-  const company = prompt('Company name:');
-  if (!company) return;
-  const text = prompt('Task:');
-  if (!text) return;
+  const title = prompt('Task title:');
+  if (!title) return;
+  const description = prompt('Description (optional):') || '';
 
-  const result = await saveTask({
-    company,
-    text,
-    dueDate: new Date(Date.now() + 86400000 * 3).toISOString()
+  const result = await fetchAPI('/tasks', {
+    method: 'POST',
+    body: JSON.stringify({
+      title,
+      description,
+      dueDate: new Date(Date.now() + 86400000 * 3).toISOString()
+    })
   });
 
   if (result) {
@@ -695,7 +678,10 @@ async function addTask() {
 }
 
 async function completeTask(id) {
-  const result = await updateTask(id, { completed: true });
+  const result = await fetchAPI(`/tasks/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ completed: true })
+  });
   if (result) {
     renderTasks();
     showToast('Task completed');
@@ -709,7 +695,7 @@ async function exportCSV() {
   const prospects = await getProspects();
   const headers = ['Company', 'Contact', 'Email', 'Phone', 'City', 'Postcode', 'Status', 'Notes', 'Created'];
   const rows = prospects.map(p => [
-    p.company, p.name, p.email, p.phone, p.city, p.postcode, p.status, p.notes, p.createdAt
+    p.company, p.contact || p.name, p.email, p.phone, p.city, p.postcode, p.status, p.notes, p.created_at
   ]);
 
   const csv = [headers, ...rows].map(r => r.map(x => `"${(x || '').replace(/"/g, '""')}"`).join(',')).join('\n');
