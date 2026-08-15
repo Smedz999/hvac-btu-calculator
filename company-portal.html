@@ -602,6 +602,10 @@
           <input type="number" id="profileRadius" min="5" max="100" />
         </div>
       </div>
+      <div class="form-group">
+        <label>F-Gas Certificate Number</label>
+        <input type="text" id="profileFgas" placeholder="e.g. FG12345678" />
+      </div>
       <button class="btn btn-primary" onclick="updateProfile()">Save Changes</button>
     </div>
 
@@ -1240,6 +1244,7 @@ function loadProfile() {
   document.getElementById('profilePhone').value = currentUser.phone || '';
   document.getElementById('profilePostcode').value = currentUser.postcode;
   document.getElementById('profileRadius').value = currentUser.radius || 25;
+  document.getElementById('profileFgas').value = currentUser.fgas_number || '';
   document.getElementById('notifyEmail').checked = currentUser.notifyEmail !== false;
   document.getElementById('notifySMS').checked = currentUser.notifySMS === true;
 }
@@ -1250,6 +1255,25 @@ async function updateProfile() {
   currentUser.phone = document.getElementById('profilePhone').value.trim();
   currentUser.postcode = document.getElementById('profilePostcode').value.trim().toUpperCase();
   currentUser.radius = parseInt(document.getElementById('profileRadius').value) || 25;
+  currentUser.fgas_number = document.getElementById('profileFgas').value.trim() || null;
+
+  // Save to database
+  try {
+    await fetch(`${API_URL}/companies/${currentUser.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company: currentUser.company,
+        name: currentUser.name,
+        phone: currentUser.phone,
+        postcode: currentUser.postcode,
+        radius: currentUser.radius,
+        fgas_number: currentUser.fgas_number
+      })
+    });
+  } catch (err) {
+    console.error('Failed to save profile to database:', err);
+  }
 
   // Update in companies list too
   const companies = getCompanies();
