@@ -13,6 +13,19 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="-1">
   <meta name="version" content="2.1">
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#00d4aa">
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ACConnx">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512x512.png">
   <style>
     :root {
       --primary: #0a2540;
@@ -387,6 +400,105 @@
     #paymentModal .modal { max-width: 500px; }
     #card-element { padding: 1rem; border: 2px solid var(--border); border-radius: 8px; margin: 1rem 0; }
     #card-errors { color: var(--danger); font-size: 0.9rem; margin-top: 0.5rem; }
+
+    /* PWA Install Banner */
+    .pwa-install-banner {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--primary);
+      color: white;
+      padding: 1rem 1.5rem;
+      z-index: 1000;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+      animation: slideUp 0.3s ease;
+    }
+    .pwa-install-banner.show { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .pwa-install-banner .banner-text { flex: 1; }
+    .pwa-install-banner .banner-text strong { display: block; font-size: 0.95rem; }
+    .pwa-install-banner .banner-text span { font-size: 0.8rem; opacity: 0.8; }
+    .pwa-install-banner .banner-actions { display: flex; gap: 0.5rem; }
+    .pwa-install-banner button {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .pwa-install-banner .btn-install { background: var(--accent); color: var(--primary); }
+    .pwa-install-banner .btn-dismiss { background: rgba(255,255,255,0.2); color: white; }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+    /* Offline Indicator */
+    .offline-banner {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: var(--warning);
+      color: #000;
+      text-align: center;
+      padding: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      z-index: 1001;
+    }
+    .offline-banner.show { display: block; }
+
+    /* iOS install instructions modal */
+    .ios-install-modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1002;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .ios-install-modal.show { display: flex; }
+    .ios-install-modal .modal-content {
+      background: white;
+      border-radius: 16px;
+      padding: 2rem;
+      max-width: 400px;
+      text-align: center;
+    }
+    .ios-install-modal .modal-content h3 { margin-bottom: 1rem; color: var(--primary); }
+    .ios-install-modal .modal-content p { margin-bottom: 0.75rem; color: var(--text-light); font-size: 0.9rem; }
+    .ios-install-modal .modal-content .step {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 0.75rem 0;
+      text-align: left;
+    }
+    .ios-install-modal .step-num {
+      width: 28px; height: 28px;
+      background: var(--accent);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+    .ios-install-modal .close-modal {
+      margin-top: 1rem;
+      padding: 0.6rem 2rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
   </style>
   <!-- Google Analytics GA4 — Replace G-0CSBDRJ6P4 with your measurement ID -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-0CSBDRJ6P4"></script>
@@ -398,6 +510,43 @@
   </script>
 </head>
 <body>
+
+<!-- PWA: Offline Banner -->
+<div class="offline-banner" id="offlineBanner">📡 You're offline — showing cached data</div>
+
+<!-- PWA: Install Banner -->
+<div class="pwa-install-banner" id="pwaInstallBanner">
+  <div class="banner-text">
+    <strong>Install ACConnx</strong>
+    <span>Add to your home screen for quick access</span>
+  </div>
+  <div class="banner-actions">
+    <button class="btn-install" onclick="installPWA()">Install</button>
+    <button class="btn-dismiss" onclick="dismissInstallBanner()">Not now</button>
+  </div>
+</div>
+
+<!-- PWA: iOS Install Instructions Modal -->
+<div class="ios-install-modal" id="iosInstallModal">
+  <div class="modal-content">
+    <h3>📱 Install ACConnx</h3>
+    <p>Add ACConnx to your home screen for the best experience:</p>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div>Tap the <strong>Share</strong> button <span style="font-size:1.2rem;">⬆️</span> in Safari</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div>Scroll down and tap <strong>"Add to Home Screen"</strong></div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div>Tap <strong>"Add"</strong> in the top right</div>
+    </div>
+    <p style="margin-top:1rem;font-size:0.8rem;">Note: Push notifications are not available on iOS. You'll receive email notifications instead.</p>
+    <button class="close-modal" onclick="document.getElementById('iosInstallModal').classList.remove('show')">Got it!</button>
+  </div>
+</div>
 
 <nav class="nav" id="mainNav" style="display:none;">
   <div class="nav-brand">AC<span>Connx</span></div>
@@ -1580,6 +1729,208 @@ function init() {
 }
 
 init();
+
+// =====================
+// PWA — Service Worker, Install, Push, Offline
+// =====================
+let deferredInstallPrompt = null;
+let swRegistration = null;
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      swRegistration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      console.log('[PWA] Service worker registered:', swRegistration.scope);
+    } catch (err) {
+      console.log('[PWA] SW registration failed:', err);
+    }
+  });
+}
+
+// Install prompt handling
+window.addEventListener('beforeinstallprompt', (e) => {
+  console.log('[PWA] Install prompt available');
+  e.preventDefault();
+  deferredInstallPrompt = e;
+
+  // Only show banner if user is logged in
+  if (currentUser) {
+    showInstallBanner();
+  }
+});
+
+// Detect if already installed
+window.addEventListener('appinstalled', () => {
+  console.log('[PWA] App installed');
+  deferredInstallPrompt = null;
+  document.getElementById('pwaInstallBanner').classList.remove('show');
+  showToast('ACConnx installed! Find it on your home screen.', 'success');
+});
+
+// Check if running as installed PWA
+function isInstalledPWA() {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+         window.navigator.standalone === true;
+}
+
+function showInstallBanner() {
+  // Don't show if already installed
+  if (isInstalledPWA()) return;
+
+  // Don't show if user dismissed recently (7 days)
+  const dismissed = localStorage.getItem('pwa_install_dismissed');
+  if (dismissed && Date.now() - parseInt(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
+
+  // Check if iOS (no beforeinstallprompt support)
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if (isIOS) {
+    // Show iOS-specific install banner
+    if (!window.navigator.standalone) {
+      document.getElementById('pwaInstallBanner').classList.add('show');
+    }
+    return;
+  }
+
+  if (deferredInstallPrompt) {
+    document.getElementById('pwaInstallBanner').classList.add('show');
+  }
+}
+
+async function installPWA() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+  if (isIOS) {
+    // Show iOS instructions modal
+    document.getElementById('pwaInstallBanner').classList.remove('show');
+    document.getElementById('iosInstallModal').classList.add('show');
+    return;
+  }
+
+  if (!deferredInstallPrompt) return;
+
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  console.log('[PWA] Install outcome:', outcome);
+  deferredInstallPrompt = null;
+  document.getElementById('pwaInstallBanner').classList.remove('show');
+}
+
+function dismissInstallBanner() {
+  document.getElementById('pwaInstallBanner').classList.remove('show');
+  localStorage.setItem('pwa_install_dismissed', Date.now().toString());
+}
+
+// Show install banner after login (hook into showApp)
+const _origShowApp = typeof showApp === 'function' ? showApp : null;
+if (_origShowApp) {
+  showApp = function() {
+    _origShowApp.apply(this, arguments);
+    // Delay to let the UI settle
+    setTimeout(showInstallBanner, 2000);
+    // Request push permission after login
+    setTimeout(requestPushPermission, 5000);
+  };
+}
+
+// =====================
+// PUSH NOTIFICATIONS
+// =====================
+async function requestPushPermission() {
+  if (!('Notification' in window) || !('PushManager' in window)) {
+    console.log('[PWA] Push notifications not supported');
+    return;
+  }
+
+  if (Notification.permission === 'granted') {
+    subscribeToPush();
+    return;
+  }
+
+  if (Notification.permission === 'denied') {
+    console.log('[PWA] Push notifications denied');
+    return;
+  }
+
+  // Request permission
+  const permission = await Notification.requestPermission();
+  if (permission === 'granted') {
+    showToast('Push notifications enabled! 🔔', 'success');
+    subscribeToPush();
+  }
+}
+
+async function subscribeToPush() {
+  if (!swRegistration || !currentUser) return;
+
+  try {
+    // Get VAPID public key from server
+    const keyRes = await fetch('/api/push/vapid-key');
+    if (!keyRes.ok) {
+      console.log('[PWA] Push not configured on server');
+      return;
+    }
+    const { publicKey } = await keyRes.json();
+
+    const subscription = await swRegistration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    });
+
+    // Send subscription to server
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyId: currentUser.id,
+        subscription: subscription.toJSON()
+      })
+    });
+
+    console.log('[PWA] Push subscription saved');
+  } catch (err) {
+    console.log('[PWA] Push subscription failed:', err);
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+// =====================
+// OFFLINE DETECTION
+// =====================
+function updateOnlineStatus() {
+  const banner = document.getElementById('offlineBanner');
+  if (navigator.onLine) {
+    banner.classList.remove('show');
+    // Try background sync when back online
+    if (swRegistration && 'sync' in swRegistration) {
+      swRegistration.sync.register('sync-lead-actions').catch(() => {});
+    }
+  } else {
+    banner.classList.add('show');
+  }
+}
+
+window.addEventListener('online', () => {
+  updateOnlineStatus();
+  showToast('Back online! 🟢', 'success');
+});
+window.addEventListener('offline', () => {
+  updateOnlineStatus();
+  showToast('You\'re offline — changes will sync when reconnected', 'info');
+});
+
+// Initial check
+updateOnlineStatus();
 </script>
 
 </body>

@@ -17,7 +17,8 @@
     "resend": "^2.0.0",
     "stripe": "^14.0.0",
     "twilio": "^6.0.2",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

@@ -4,6 +4,23 @@ const bcrypt = require('bcryptjs');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
+// Web Push (VAPID)
+let webpush = null;
+try {
+  webpush = require('web-push');
+  const vapidPublic = process.env.VAPID_PUBLIC_KEY;
+  const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
+  if (vapidPublic && vapidPrivate) {
+    webpush.setVapidDetails('mailto:admin@acconnx.com', vapidPublic, vapidPrivate);
+    console.log('✅ Web Push initialized');
+  } else {
+    console.log('⚠️ VAPID keys not set — push notifications disabled');
+    webpush = null;
+  }
+} catch (e) {
+  console.log('⚠️ web-push not installed');
+}
+
 const app = express();
 const port = process.env.PORT || 3001;
 
@@ -598,6 +615,18 @@ async function distributeLead(lead) {
           console.log('Failed to send lead notification:', e.message);
         }
       }
+
+      // Send push notification
+      try {
+        await sendPushToCompany(company.id, {
+          title: '🔥 New Lead!',
+          body: `${lead.customer_name} — ${lead.postcode}${lead.btu ? ' — ' + lead.btu.toLocaleString() + ' BTU' : ''}`,
+          url: '/company-portal.html#leads',
+          tag: 'lead-' + Date.now()
+        });
+      } catch (e) {
+        console.log('Failed to send push notification:', e.message);
+      }
     }
 
     return selected.map(c => c.company);
@@ -767,6 +796,145 @@ app.delete('/api/tasks/:id', async (req, res) => {
 });
 
 // =====================
+// PUSH NOTIFICATIONS
+// =====================
+
+// Get VAPID public key (client needs this to subscribe)
+app.get('/api/push/vapid-key', (req, res) => {
+  const publicKey = process.env.VAPID_PUBLIC_KEY;
+  if (!publicKey) {
+    return res.status(503).json({ error: 'Push notifications not configured' });
+  }
+  res.json({ publicKey });
+});
+
+// Subscribe to push notifications
+app.post('/api/push/subscribe', async (req, res) => {
+  try {
+    const { companyId, subscription } = req.body;
+
+    if (!companyId || !subscription) {
+      return res.status(400).json({ error: 'companyId and subscription are required' });
+    }
+
+    // Store subscription in company record
+    const { data, error } = await supabase
+      .from('companies')
+      .update({
+        push_subscription: JSON.stringify(subscription),
+        push_enabled: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', companyId)
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Company not found' });
+
+    console.log(`📱 Push subscribed for company ${companyId}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Unsubscribe from push notifications
+app.post('/api/push/unsubscribe', async (req, res) => {
+  try {
+    const { companyId } = req.body;
+
+    if (!companyId) {
+      return res.status(400).json({ error: 'companyId is required' });
+    }
+
+    const { error } = await supabase
+      .from('companies')
+      .update({
+        push_subscription: null,
+        push_enabled: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', companyId);
+
+    if (error) throw error;
+
+    console.log(`📱 Push unsubscribed for company ${companyId}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Send push notification to a specific contractor
+app.post('/api/push/notify', async (req, res) => {
+  try {
+    const { companyId, title, body, url, tag } = req.body;
+
+    if (!companyId || !title || !body) {
+      return res.status(400).json({ error: 'companyId, title, and body are required' });
+    }
+
+    const result = await sendPushToCompany(companyId, { title, body, url, tag });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Helper: send push notification to a company
+async function sendPushToCompany(companyId, { title, body, url, tag }) {
+  if (!webpush) {
+    console.log('⚠️ Push not configured, skipping notification');
+    return { success: false, reason: 'push_not_configured' };
+  }
+
+  try {
+    // Get company's push subscription
+    const { data: company, error } = await supabase
+      .from('companies')
+      .select('push_subscription, push_enabled')
+      .eq('id', companyId)
+      .single();
+
+    if (error || !company) {
+      return { success: false, reason: 'company_not_found' };
+    }
+
+    if (!company.push_enabled || !company.push_subscription) {
+      return { success: false, reason: 'not_subscribed' };
+    }
+
+    const subscription = JSON.parse(company.push_subscription);
+
+    const payload = JSON.stringify({
+      title: title || 'ACConnx',
+      body,
+      icon: '/icons/icon-192x192.png',
+      badge: '/icons/icon-72x72.png',
+      tag: tag || 'acconnx-lead',
+      data: { url: url || '/company-portal.html' },
+      requireInteraction: true
+    });
+
+    await webpush.sendNotification(subscription, payload);
+    console.log(`📱 Push sent to company ${companyId}: ${title}`);
+    return { success: true };
+  } catch (err) {
+    // If subscription is expired/invalid, clean it up
+    if (err.statusCode === 404 || err.statusCode === 410) {
+      console.log(`📱 Push subscription expired for company ${companyId}, cleaning up`);
+      await supabase
+        .from('companies')
+        .update({ push_subscription: null, push_enabled: false })
+        .eq('id', companyId);
+    }
+    console.error(`📱 Push send failed for company ${companyId}:`, err.message);
+    return { success: false, reason: err.message };
+  }
+}
+
+// =====================
 // START SERVER
 // =====================
 if (process.env.VERCEL) {
@@ -777,6 +945,7 @@ if (process.env.VERCEL) {
     console.log(`💳 Stripe: ${stripe ? '✅ Connected' : '⚠️ Not configured'}`);
     console.log(`📧 Resend: ${resend ? '✅ Connected' : '⚠️ Not configured'}`);
     console.log(`📱 Twilio: ${twilio ? '✅ Connected' : '⚠️ Not configured'}`);
+    console.log(`🔔 Push: ${webpush ? '✅ Connected' : '⚠️ Not configured'}`);
     console.log(`🗄️ Database: ✅ Supabase`);
   });
 }
