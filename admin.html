@@ -303,6 +303,27 @@
       color: white;
     }
 
+    .add-credits-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      line-height: 1;
+      vertical-align: middle;
+      margin-left: 0.35rem;
+      transition: all 0.2s;
+    }
+
+    .add-credits-btn:hover {
+      background: var(--accent-dark);
+      transform: scale(1.15);
+    }
+
     /* Login Gate */
     .login-gate {
       display: flex;
@@ -781,7 +802,7 @@ function renderCompanies() {
         <td>${company.phone || '—'}</td>
         <td>${company.postcode}</td>
         <td>${company.fgas_number || '<span style="color:var(--text-light);">—</span>'}</td>
-        <td><strong>${company.credits || 0}</strong></td>
+        <td><strong>${company.credits || 0}</strong> <button class="add-credits-btn" onclick="addCredits(${company.id}, '${company.company.replace(/'/g, "\\'")}')" title="Add credits">+</button></td>
         <td>${companyLeads.length}</td>
         <td>${formatDate(company.created_at)}</td>
       </tr>
@@ -901,6 +922,33 @@ function renderAnalytics() {
   });
   activityHtml += '</div>';
   document.getElementById('activityLog').innerHTML = activityHtml;
+}
+
+// =====================
+// ADD CREDITS
+// =====================
+async function addCredits(companyId, companyName) {
+  const amount = prompt(`Add credits to ${companyName}:\n\nEnter number of credits to add:`);
+  if (!amount || isNaN(amount) || parseInt(amount) <= 0) return;
+
+  const credits = parseInt(amount);
+  const company = cachedCompanies.find(c => c.id === companyId);
+  if (!company) return;
+
+  const newCredits = (company.credits || 0) + credits;
+
+  const result = await fetchAPI(`/companies/${companyId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ credits: newCredits })
+  });
+
+  if (result && result.success) {
+    showToast(`Added ${credits} credits to ${companyName}. New balance: ${newCredits}`, 'success');
+    await loadAllData();
+    renderCompanies();
+  } else {
+    showToast('Failed to add credits', 'error');
+  }
 }
 
 // =====================
