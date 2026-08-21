@@ -631,11 +631,14 @@ async function fetchAPI(endpoint, options = {}) {
       headers: { 'Content-Type': 'application/json' },
       ...options
     });
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    if (!res.ok) {
+      console.error(`API error ${res.status} for ${endpoint}`);
+      throw new Error(`API error: ${res.status}`);
+    }
     return await res.json();
   } catch (err) {
-    console.error('API fetch failed:', err);
-    showToast('Failed to load data. Check API connection.', 'error');
+    console.error('API fetch failed:', endpoint, err);
+    showToast('Failed to load data: ' + endpoint, 'error');
     return null;
   }
 }
@@ -656,14 +659,22 @@ async function loadAllData() {
 // =====================
 async function loadStats() {
   const stats = await fetchAPI('/admin/stats');
-  if (!stats) return;
+  if (!stats) {
+    console.error('Failed to load stats');
+    return;
+  }
+  
+  // API returns: totalLeads (undistributed only), distributedLeads, totalCompanies, totalCredits, conversionRate, totalRevenue
+  const totalLeads = stats.totalLeads || 0;
+  const distributedLeads = stats.distributedLeads || 0;
+  const allLeads = totalLeads + distributedLeads;
   
   document.getElementById('statCompanies').textContent = stats.totalCompanies || 0;
-  document.getElementById('statLeads').textContent = (stats.totalLeads || 0) + (stats.distributedLeads || 0);
-  document.getElementById('statDistributed').textContent = stats.distributedLeads || 0;
+  document.getElementById('statLeads').textContent = allLeads;
+  document.getElementById('statDistributed').textContent = distributedLeads;
   document.getElementById('statCredits').textContent = stats.totalCredits || 0;
   document.getElementById('statConversion').textContent = (stats.conversionRate || 0) + '%';
-  document.getElementById('statPending').textContent = stats.totalLeads || 0;
+  document.getElementById('statPending').textContent = totalLeads; // This is the undistributed count
   document.getElementById('totalRevenue').textContent = '£' + (stats.totalRevenue || '0');
 }
 
