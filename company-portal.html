@@ -1145,19 +1145,8 @@ async function login() {
     showToast('Welcome back, ' + currentUser.name + '!');
     showApp();
   } catch (err) {
-    // Fallback to localStorage
-    const companies = getCompanies();
-    const company = companies.find(c => c.email === email && c.password === password);
-
-    if (!company) {
-      showToast('Invalid email or password', 'error');
-      return;
-    }
-
-    currentUser = company;
-    localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
-    showToast('Welcome back, ' + company.name + '! (Offline mode)');
-    showApp();
+    console.error('Login error:', err);
+    showToast('Login failed. Please check your connection and try again.', 'error');
   }
 }
 
