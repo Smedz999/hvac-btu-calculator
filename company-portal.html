@@ -1241,11 +1241,19 @@ async function loadDashboard() {
 // LEADS
 // =====================
 async function loadLeads() {
-  if (!currentUser) return;
+  if (!currentUser) {
+    console.error('No currentUser found');
+    showToast('Please log in again', 'error');
+    return;
+  }
+
+  console.log('Loading leads for company:', currentUser.id);
 
   try {
     // Refresh user data from database
     const userRes = await fetch(`${API_URL}/companies`);
+    if (!userRes.ok) throw new Error('Failed to fetch companies');
+    
     const companies = await userRes.json();
     const freshUser = companies.find(c => c.id === currentUser.id);
     if (freshUser) {
@@ -1255,10 +1263,14 @@ async function loadLeads() {
     }
 
     const res = await fetch(`${API_URL}/leads?companyId=${currentUser.id}`);
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    
     const leads = await res.json();
+    console.log('Leads loaded:', leads.length);
     renderLeadsTable(leads);
   } catch (err) {
-    showToast('Failed to load leads', 'error');
+    console.error('loadLeads error:', err);
+    showToast('Failed to load leads: ' + err.message, 'error');
   }
 }
 
