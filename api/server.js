@@ -104,7 +104,7 @@ app.get('/api/health', async (req, res) => {
 // =====================
 app.post('/api/companies/register', async (req, res) => {
   try {
-    const { company, name, email, phone, password, postcode, radius, fgas_number } = req.body;
+    const { company, name, email, phone, password, postcode, radius, fgas_number, coverage_areas } = req.body;
 
     if (!company || !name || !email || !phone || !password || !postcode) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -124,6 +124,9 @@ app.post('/api/companies/register', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Default coverage areas to the postcode prefix if not provided
+    const defaultCoverage = coverage_areas || [postcode.toUpperCase().split(' ')[0]];
+
     const { data: companyData, error } = await supabase
       .from('companies')
       .insert({
@@ -135,7 +138,8 @@ app.post('/api/companies/register', async (req, res) => {
         postcode: postcode.toUpperCase(),
         radius: radius || 25,
         credits: 5,
-        fgas_number: fgas_number || null
+        fgas_number: fgas_number || null,
+        coverage_areas: defaultCoverage
       })
       .select()
       .single();
@@ -290,7 +294,7 @@ app.get('/api/companies', async (req, res) => {
   try {
     const { data: companies, error } = await supabase
       .from('companies')
-      .select('id, company, name, email, phone, postcode, radius, credits, created_at, updated_at');
+      .select('id, company, name, email, phone, postcode, radius, credits, coverage_areas, created_at, updated_at');
 
     if (error) throw error;
     res.json(companies);
@@ -309,7 +313,7 @@ app.put('/api/companies/:id', async (req, res) => {
       .from('companies')
       .update(updates)
       .eq('id', req.params.id)
-      .select('id, company, name, email, phone, postcode, radius, credits, created_at, updated_at')
+      .select('id, company, name, email, phone, postcode, radius, credits, coverage_areas, created_at, updated_at')
       .single();
 
     if (error) throw error;
@@ -533,15 +537,31 @@ async function distributeLead(lead) {
     const leadPrefix = lead.postcode?.split(' ')[0];
     if (!leadPrefix) return [];
 
-    // Find eligible companies (have credits, matching postcode area)
-    const { data: eligible, error } = await supabase
+    // Find eligible companies (have credits, matching coverage area)
+    // Check if lead prefix matches any of the company's coverage areas
+    const { data: allCompanies, error } = await supabase
       .from('companies')
       .select('*')
-      .gt('credits', 0)
-      .or(`postcode.ilike.${leadPrefix}%,postcode.ilike.${leadPrefix.substring(0, 2)}%`);
+      .gt('credits', 0);
 
     if (error) throw error;
-    if (!eligible || eligible.length === 0) return [];
+    if (!allCompanies || allCompanies.length === 0) return [];
+
+    // Filter companies whose coverage areas include the lead prefix
+    const eligible = allCompanies.filter(company => {
+      // If no coverage areas set, fall back to old postcode matching
+      if (!company.coverage_areas || company.coverage_areas.length === 0) {
+        const companyPrefix = company.postcode?.split(' ')[0];
+        return companyPrefix === leadPrefix || 
+               companyPrefix?.substring(0, 2) === leadPrefix.substring(0, 2);
+      }
+      // Check if any coverage area matches the lead prefix
+      return company.coverage_areas.some(area => 
+        leadPrefix.startsWith(area) || area.startsWith(leadPrefix)
+      );
+    });
+
+    if (eligible.length === 0) return [];
 
     // Count leads already received per company
     const companyIds = eligible.map(c => c.id);
