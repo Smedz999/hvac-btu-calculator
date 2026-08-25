@@ -24,7 +24,7 @@ try {
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Supabase connection
+// Supabase connection with better error handling
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
@@ -32,7 +32,32 @@ if (!supabaseUrl || !supabaseKey) {
   console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY environment variables');
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Create Supabase client with options to handle JWT issues
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'acconnx-api'
+    }
+  }
+});
+
+// Add error handling wrapper for Supabase queries
+async function safeQuery(queryFn) {
+  try {
+    return await queryFn();
+  } catch (err) {
+    // Check for JWT errors
+    if (err.message && err.message.includes('JWT')) {
+      console.error('JWT Error - check SUPABASE_SERVICE_KEY:', err.message);
+      throw new Error('Database authentication error. Please check server configuration.');
+    }
+    throw err;
+  }
+}
 
 console.log('✅ Supabase initialized');
 
@@ -79,9 +104,15 @@ app.use(express.json());
 // =====================
 app.get('/api/health', async (req, res) => {
   try {
-    const { count: companies } = await supabase.from('companies').select('*', { count: 'exact', head: true });
-    const { count: leads } = await supabase.from('leads').select('*', { count: 'exact', head: true });
-    const { count: purchases } = await supabase.from('purchases').select('*', { count: 'exact', head: true });
+    // Test database connection with a simple query
+    const { count: companies, error: compError } = await supabase.from('companies').select('*', { count: 'exact', head: true });
+    if (compError) throw compError;
+    
+    const { count: leads, error: leadError } = await supabase.from('leads').select('*', { count: 'exact', head: true });
+    if (leadError) throw leadError;
+    
+    const { count: purchases, error: purError } = await supabase.from('purchases').select('*', { count: 'exact', head: true });
+    if (purError) throw purError;
 
     res.json({
       status: 'ok',
@@ -95,7 +126,20 @@ app.get('/api/health', async (req, res) => {
       purchases: purchases || 0
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    // Check for JWT errors specifically
+    if (err.message && (err.message.includes('JWT') || err.message.includes('jwt'))) {
+      return res.status(503).json({ 
+        status: 'error',
+        error: 'Database authentication failed',
+        message: 'JWT token issue - check SUPABASE_SERVICE_KEY in environment variables',
+        timestamp: new Date().toISOString()
+      });
+    }
+    res.status(500).json({ 
+      status: 'error',
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
@@ -298,6 +342,23 @@ app.get('/api/companies', async (req, res) => {
 
     if (error) throw error;
     res.json(companies);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/companies/:id', async (req, res) => {
+  try {
+    const { data: company, error } = await supabase
+      .from('companies')
+      .select('id, company, name, email, phone, postcode, radius, credits, coverage_areas, created_at, updated_at')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error) throw error;
+    if (!company) return res.status(404).json({ error: 'Company not found' });
+
+    res.json(company);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

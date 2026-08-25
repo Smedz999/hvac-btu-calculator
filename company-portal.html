@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ACConnx — Contractor Portal</title>
   <script src="https://js.stripe.com/v3/"></script>
-  <script>window.ACCONN_VERSION = '2.1-' + Date.now();</script>
+  <script>window.ACCONN_VERSION = '2.2-' + Date.now();</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="-1">
-  <meta name="version" content="2.1">
+  <meta name="version" content="2.2">
   <!-- PWA -->
   <link rel="manifest" href="/manifest-contractor.json">
   <meta name="theme-color" content="#1e3a5f">
@@ -945,8 +945,8 @@
 // =====================
 const API_URL = '/api';
 
-// Fallback: if API fails, use localStorage
-let useLocalFallback = false;
+// NO localStorage fallback - always use server data
+// This prevents stale data and sync issues
 
 const STRIPE_KEY = 'pk_live_51TzjYYQokr1Jt8tzHKSANoFMLj8YPacgZ55LehWYhAsj3NF8VRx3RU7f1r6WwVyBi7PDTxexdWpwRG2XrpV6vVPq00K5Jq7RoF'; // Stripe live publishable key
 
@@ -1103,29 +1103,8 @@ async function register() {
     showToast('Account created! You have 5 free credits to start.');
     showApp();
   } catch (err) {
-    // Fallback to localStorage
-    const companies = getCompanies();
-    if (companies.find(c => c.email === email)) {
-      showToast('Email already registered. Please login.', 'error');
-      return;
-    }
-
-    const companyData = {
-      id: 'comp_' + Date.now(),
-      company, name, email, phone, password, postcode, radius,
-      credits: 5, // 5 free credits for new accounts
-      hasPurchased: false, // Track if they've made first purchase
-      createdAt: new Date().toISOString(),
-      notifyEmail: true
-    };
-
-    companies.push(companyData);
-    saveCompanies(companies);
-
-    currentUser = companyData;
-    localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
-    showToast('Account created! You have 5 free credits to start. (Offline mode)');
-    showApp();
+    console.error('Registration error:', err);
+    showToast('Registration failed. Please check your connection and try again.', 'error');
   }
 }
 
@@ -1195,9 +1174,10 @@ async function loadDashboard() {
 
   try {
     // Refresh user data from database to get live credit count
-    const userRes = await fetch(`${API_URL}/companies`);
-    const companies = await userRes.json();
-    const freshUser = companies.find(c => c.id === currentUser.id);
+    const userRes = await fetch(`${API_URL}/companies/${currentUser.id}`);
+    if (!userRes.ok) throw new Error('Failed to fetch user data');
+    
+    const freshUser = await userRes.json();
     if (freshUser) {
       currentUser = { ...currentUser, ...freshUser };
       localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
@@ -1251,11 +1231,10 @@ async function loadLeads() {
 
   try {
     // Refresh user data from database
-    const userRes = await fetch(`${API_URL}/companies`);
-    if (!userRes.ok) throw new Error('Failed to fetch companies');
+    const userRes = await fetch(`${API_URL}/companies/${currentUser.id}`);
+    if (!userRes.ok) throw new Error('Failed to fetch user data');
     
-    const companies = await userRes.json();
-    const freshUser = companies.find(c => c.id === currentUser.id);
+    const freshUser = await userRes.json();
     if (freshUser) {
       currentUser = { ...currentUser, ...freshUser };
       localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
@@ -1439,32 +1418,9 @@ async function processPayment() {
   if (!selectedPackage) return;
   let paymentSucceeded = false;
 
-  // If Stripe is not configured, fall back to demo mode
+  // If Stripe is not configured, show error
   if (!STRIPE_KEY || !STRIPE_KEY.startsWith('pk_')) {
-    // Demo mode: add credits immediately
-    const isFirstPurchase = !currentUser.hasPurchased;
-    const amountPaid = isFirstPurchase ? selectedPackage.firstPriceDisplay : selectedPackage.priceDisplay;
-    
-    currentUser.credits = (currentUser.credits || 0) + selectedPackage.credits;
-    currentUser.hasPurchased = true;
-    
-    // Save purchase to localStorage
-    const purchases = getPurchases();
-    purchases.push({
-      id: 'pur_' + Date.now(),
-      companyId: currentUser.id,
-      package: selectedPackage.name,
-      credits: selectedPackage.credits,
-      amount: amountPaid,
-      isFirstPurchase: isFirstPurchase,
-      createdAt: new Date().toISOString()
-    });
-    savePurchases(purchases);
-
-    updateCurrentUser();
-    closePaymentModal();
-    showToast(`Purchased ${selectedPackage.credits} credits! (Demo mode - no payment processed)`);
-    loadPurchaseHistory();
+    showToast('Payment system not configured. Please contact support.', 'error');
     return;
   }
 
@@ -1635,14 +1591,8 @@ async function updateProfile() {
     });
   } catch (err) {
     console.error('Failed to save profile to database:', err);
-  }
-
-  // Update in companies list too
-  const companies = getCompanies();
-  const idx = companies.findIndex(c => c.id === currentUser.id);
-  if (idx >= 0) {
-    companies[idx] = currentUser;
-    saveCompanies(companies);
+    showToast('Failed to save profile. Please try again.', 'error');
+    return;
   }
 
   updateCurrentUser();
@@ -1657,43 +1607,12 @@ function updateNotifications() {
 }
 
 // =====================
-// DATA STORAGE
+// DATA STORAGE - REMOVED localStorage fallback
+// All data now comes from server only
 // =====================
-function getCompanies() {
-  return JSON.parse(localStorage.getItem('hvac_companies') || '[]');
-}
-
-function saveCompanies(companies) {
-  localStorage.setItem('hvac_companies', JSON.stringify(companies));
-}
-
-function getLeads() {
-  return JSON.parse(localStorage.getItem('hvac_leads') || '[]');
-}
-
-function saveLeads(leads) {
-  localStorage.setItem('hvac_leads', JSON.stringify(leads));
-}
-
-function getPurchases() {
-  return JSON.parse(localStorage.getItem('hvac_purchases') || '[]');
-}
-
-function savePurchases(purchases) {
-  localStorage.setItem('hvac_purchases', JSON.stringify(purchases));
-}
 
 function updateCurrentUser() {
   localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
-
-  // Sync with companies list
-  const companies = getCompanies();
-  const idx = companies.findIndex(c => c.id === currentUser.id);
-  if (idx >= 0) {
-    companies[idx] = currentUser;
-    saveCompanies(companies);
-  }
-
   updateNavCredits();
 }
 
