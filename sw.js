@@ -1,12 +1,11 @@
-/// ACConnx Service Worker v1.0.0
-const CACHE_VERSION = 'acconnx-v1.0.0';
+/// ACConnx Service Worker v1.0.1
+const CACHE_VERSION = "acconnx-v1.0.2";
 const STATIC_CACHE = CACHE_VERSION + '-static';
 const DYNAMIC_CACHE = CACHE_VERSION + '-dynamic';
 const API_CACHE = CACHE_VERSION + '-api';
 
 // Static assets to pre-cache
 const PRECACHE_ASSETS = [
-  '/company-portal.html',
   '/manifest.json',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
