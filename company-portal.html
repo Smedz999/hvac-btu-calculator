@@ -892,6 +892,13 @@
         <label>F-Gas Certificate Number</label>
         <input type="text" id="profileFgas" placeholder="e.g. FG12345678" />
       </div>
+      <div class="form-group">
+        <label>Coverage Areas (postcode prefixes)</label>
+        <input type="text" id="profileCoverageAreas" placeholder="e.g. SK, WA, M" />
+        <small style="color:var(--text-light);display:block;margin-top:0.25rem;">
+          Enter postcode areas you cover, separated by commas. Leads in these areas will be sent to you.
+        </small>
+      </div>
       <button class="btn btn-primary" onclick="updateProfile()">Save Changes</button>
     </div>
 
@@ -1581,6 +1588,7 @@ function loadProfile() {
   document.getElementById('profilePostcode').value = currentUser.postcode;
   document.getElementById('profileRadius').value = currentUser.radius || 25;
   document.getElementById('profileFgas').value = currentUser.fgas_number || '';
+  document.getElementById('profileCoverageAreas').value = (currentUser.coverage_areas || []).join(', ');
   document.getElementById('notifyEmail').checked = currentUser.notifyEmail !== false;
 }
 
@@ -1591,6 +1599,12 @@ async function updateProfile() {
   currentUser.postcode = document.getElementById('profilePostcode').value.trim().toUpperCase();
   currentUser.radius = parseInt(document.getElementById('profileRadius').value) || 25;
   currentUser.fgas_number = document.getElementById('profileFgas').value.trim() || null;
+  
+  // Parse coverage areas from comma-separated input
+  const coverageInput = document.getElementById('profileCoverageAreas').value.trim();
+  currentUser.coverage_areas = coverageInput 
+    ? coverageInput.split(',').map(a => a.trim().toUpperCase()).filter(a => a.length > 0)
+    : [];
 
   // Save to database
   try {
@@ -1603,7 +1617,8 @@ async function updateProfile() {
         phone: currentUser.phone,
         postcode: currentUser.postcode,
         radius: currentUser.radius,
-        fgas_number: currentUser.fgas_number
+        fgas_number: currentUser.fgas_number,
+        coverage_areas: currentUser.coverage_areas
       })
     });
   } catch (err) {
