@@ -336,9 +336,28 @@ app.post('/api/companies/reset-password', async (req, res) => {
 
 app.get('/api/companies', async (req, res) => {
   try {
-    const { data: companies, error } = await supabase
-      .from('companies')
-      .select('id, company, name, email, phone, postcode, radius, credits, coverage_areas, created_at, updated_at');
+    // Try to select with coverage_areas, fall back if column doesn't exist
+    let companies, error;
+    try {
+      const result = await supabase
+        .from('companies')
+        .select('id, company, name, email, phone, postcode, radius, credits, coverage_areas, created_at, updated_at');
+      companies = result.data;
+      error = result.error;
+    } catch (e) {
+      // Column might not exist - try without it
+      if (e.message && e.message.includes('coverage_areas')) {
+        const result = await supabase
+          .from('companies')
+          .select('id, company, name, email, phone, postcode, radius, credits, created_at, updated_at');
+        companies = result.data;
+        error = result.error;
+        // Add empty coverage_areas to each company
+        if (companies) companies.forEach(c => c.coverage_areas = []);
+      } else {
+        throw e;
+      }
+    }
 
     if (error) throw error;
     res.json(companies);
@@ -349,11 +368,29 @@ app.get('/api/companies', async (req, res) => {
 
 app.get('/api/companies/:id', async (req, res) => {
   try {
-    const { data: company, error } = await supabase
-      .from('companies')
-      .select('id, company, name, email, phone, postcode, radius, credits, coverage_areas, created_at, updated_at')
-      .eq('id', req.params.id)
-      .single();
+    let company, error;
+    try {
+      const result = await supabase
+        .from('companies')
+        .select('id, company, name, email, phone, postcode, radius, credits, coverage_areas, created_at, updated_at')
+        .eq('id', req.params.id)
+        .single();
+      company = result.data;
+      error = result.error;
+    } catch (e) {
+      if (e.message && e.message.includes('coverage_areas')) {
+        const result = await supabase
+          .from('companies')
+          .select('id, company, name, email, phone, postcode, radius, credits, created_at, updated_at')
+          .eq('id', req.params.id)
+          .single();
+        company = result.data;
+        error = result.error;
+        if (company) company.coverage_areas = [];
+      } else {
+        throw e;
+      }
+    }
 
     if (error) throw error;
     if (!company) return res.status(404).json({ error: 'Company not found' });
@@ -370,12 +407,31 @@ app.put('/api/companies/:id', async (req, res) => {
     delete updates.id;
     delete updates.password;
 
-    const { data: company, error } = await supabase
-      .from('companies')
-      .update(updates)
-      .eq('id', req.params.id)
-      .select('id, company, name, email, phone, postcode, radius, credits, coverage_areas, created_at, updated_at')
-      .single();
+    let company, error;
+    try {
+      const result = await supabase
+        .from('companies')
+        .update(updates)
+        .eq('id', req.params.id)
+        .select('id, company, name, email, phone, postcode, radius, credits, coverage_areas, created_at, updated_at')
+        .single();
+      company = result.data;
+      error = result.error;
+    } catch (e) {
+      if (e.message && e.message.includes('coverage_areas')) {
+        const result = await supabase
+          .from('companies')
+          .update(updates)
+          .eq('id', req.params.id)
+          .select('id, company, name, email, phone, postcode, radius, credits, created_at, updated_at')
+          .single();
+        company = result.data;
+        error = result.error;
+        if (company) company.coverage_areas = [];
+      } else {
+        throw e;
+      }
+    }
 
     if (error) throw error;
     if (!company) return res.status(404).json({ error: 'Company not found' });
