@@ -627,7 +627,7 @@ function showAdmin() {
 }
 
 // Check existing session
-if (sessionStorage.getItem('acconnx_admin_auth') === 'true') {
+if (sessionStorage.getItem('acconnx_admin_token')) {
   showAdmin();
 }
 </script>
@@ -652,9 +652,12 @@ let cachedPurchases = [];
 // =====================
 async function fetchAPI(endpoint, options = {}) {
   try {
-    console.log('Fetching:', `${API_BASE}${endpoint}`);
+    const token = sessionStorage.getItem('acconnx_admin_token');
     const res = await fetch(`${API_BASE}${endpoint}`, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+      },
       ...options
     });
     if (!res.ok) {

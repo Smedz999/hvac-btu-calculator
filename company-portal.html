@@ -945,6 +945,12 @@
 // =====================
 const API_URL = '/api';
 
+// Auth header helper — include JWT token in all API requests
+function authHeaders() {
+  const token = localStorage.getItem('hvac_token');
+  return token ? { 'Authorization': 'Bearer ' + token } : {};
+}
+
 // NO localStorage fallback - always use server data
 // This prevents stale data and sync issues
 
@@ -1100,6 +1106,7 @@ async function register() {
 
     currentUser = data.company;
     localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+    if (data.token) localStorage.setItem('hvac_token', data.token);
     showToast('Account created! You have 5 free credits to start.');
     showApp();
   } catch (err) {
@@ -1128,6 +1135,7 @@ async function login() {
 
     currentUser = data.company;
     localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
+    if (data.token) localStorage.setItem('hvac_token', data.token);
     showToast('Welcome back, ' + currentUser.name + '!');
     showApp();
   } catch (err) {
@@ -1139,6 +1147,7 @@ async function login() {
 function logout() {
   currentUser = null;
   localStorage.removeItem('hvac_current_user');
+  localStorage.removeItem('hvac_token');
   showPage('auth');
   document.getElementById('mainNav').style.display = 'none';
 }
@@ -1174,7 +1183,7 @@ async function loadDashboard() {
 
   try {
     // Refresh user data from database to get live credit count
-    const userRes = await fetch(`${API_URL}/companies/${currentUser.id}`);
+    const userRes = await fetch(`${API_URL}/companies/${currentUser.id}`, { headers: authHeaders() });
     if (!userRes.ok) throw new Error('Failed to fetch user data');
     
     const freshUser = await userRes.json();
@@ -1184,7 +1193,7 @@ async function loadDashboard() {
       updateNavCredits();
     }
 
-    const res = await fetch(`${API_URL}/leads?companyId=${currentUser.id}`);
+    const res = await fetch(`${API_URL}/leads?companyId=${currentUser.id}`, { headers: authHeaders() });
     const userLeads = await res.json();
 
     const wonLeads = userLeads.filter(l => l.status === 'won');
@@ -1231,7 +1240,7 @@ async function loadLeads() {
 
   try {
     // Refresh user data from database
-    const userRes = await fetch(`${API_URL}/companies/${currentUser.id}`);
+    const userRes = await fetch(`${API_URL}/companies/${currentUser.id}`, { headers: authHeaders() });
     if (!userRes.ok) throw new Error('Failed to fetch user data');
     
     const freshUser = await userRes.json();
@@ -1241,7 +1250,7 @@ async function loadLeads() {
       updateNavCredits();
     }
 
-    const res = await fetch(`${API_URL}/leads?companyId=${currentUser.id}`);
+    const res = await fetch(`${API_URL}/leads?companyId=${currentUser.id}`, { headers: authHeaders() });
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     
     const leads = await res.json();
@@ -1283,7 +1292,7 @@ async function filterLeads() {
   const search = document.getElementById('leadSearch').value.toLowerCase();
 
   try {
-    const res = await fetch(`${API_URL}/leads?companyId=${currentUser.id}`);
+    const res = await fetch(`${API_URL}/leads?companyId=${currentUser.id}`, { headers: authHeaders() });
     let filtered = await res.json();
 
     if (status !== 'all') {
@@ -1304,7 +1313,7 @@ async function filterLeads() {
 }
 
 function viewLead(leadId) {
-  fetch(`${API_URL}/leads`)
+  fetch(`${API_URL}/leads?companyId=${currentUser.id}`, { headers: authHeaders() })
     .then(r => r.json())
     .then(leads => {
       const lead = leads.find(l => l.id == leadId);
@@ -1358,7 +1367,7 @@ async function updateLeadStatus(leadId, status) {
   try {
     const res = await fetch(`${API_URL}/leads/${leadId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ status })
     });
 
@@ -1578,7 +1587,7 @@ async function updateProfile() {
   try {
     await fetch(`${API_URL}/companies/${currentUser.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
         company: currentUser.company,
         name: currentUser.name,
@@ -1815,7 +1824,7 @@ async function subscribeToPush() {
     // Send subscription to server
     await fetch('/api/push/subscribe', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
         companyId: currentUser.id,
         subscription: subscription.toJSON()

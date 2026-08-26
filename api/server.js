@@ -1,4 +1,6 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
+const { generateToken, generateAdminToken, requireAuth, requireAdmin, ADMIN_PASSWORD } = require('./auth');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const { createClient } = require('@supabase/supabase-js');
@@ -96,8 +98,35 @@ try {
   console.log('⚠️ Twilio not configured');
 }
 
-app.use(cors());
+app.use(cors({ origin: ['https://acconnx.com', 'https://www.acconnx.com', 'http://localhost:3000', 'http://localhost:5000'] }));
 app.use(express.json());
+
+// Rate limiting
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // 20 attempts per window
+  message: { error: 'Too many attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 60, // 60 requests per minute
+  message: { error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const leadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // 5 leads per hour per IP
+  message: { error: 'Too many submissions. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+app.use('/api/', apiLimiter);
 
 // =====================
 // HEALTH CHECK
@@ -146,7 +175,7 @@ app.get('/api/health', async (req, res) => {
 // =====================
 // COMPANIES
 // =====================
-app.post('/api/companies/register', async (req, res) => {
+app.post('/api/companies/register', authLimiter,, async (req, res) => {
   try {
     const { company, name, email, phone, password, postcode, radius, fgas_number, coverage_areas } = req.body;
 
@@ -217,13 +246,14 @@ app.post('/api/companies/register', async (req, res) => {
     }
 
     delete companyData.password;
-    res.json({ success: true, company: companyData });
+    const token = generateToken(companyData);
+    res.json({ success: true, company: companyData, token });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/companies/login', async (req, res) => {
+app.post('/api/companies/login', authLimiter,, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -243,9 +273,21 @@ app.post('/api/companies/login', async (req, res) => {
     }
 
     delete company.password;
-    res.json({ success: true, company });
+    const token = generateToken(company);
+    res.json({ success: true, company, token });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin login endpoint
+app.post('/api/admin/login', authLimiter, (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASSWORD) {
+    const token = generateAdminToken();
+    res.json({ success: true, token });
+  } else {
+    res.status(401).json({ error: 'Invalid admin password' });
   }
 });
 
@@ -254,7 +296,7 @@ app.post('/api/companies/login', async (req, res) => {
 // =====================
 const resetCodes = new Map(); // email -> { code, expires }
 
-app.post('/api/companies/forgot-password', async (req, res) => {
+app.post('/api/companies/forgot-password', authLimiter,, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required' });
@@ -295,7 +337,7 @@ app.post('/api/companies/forgot-password', async (req, res) => {
   }
 });
 
-app.post('/api/companies/reset-password', async (req, res) => {
+app.post('/api/companies/reset-password', authLimiter,, async (req, res) => {
   try {
     const { email, code, newPassword } = req.body;
 
@@ -346,7 +388,7 @@ app.post('/api/companies/reset-password', async (req, res) => {
   }
 });
 
-app.get('/api/companies', async (req, res) => {
+app.get('/api/companies', requireAdmin, async (req, res) => {
   try {
     // Try to select with coverage_areas first
     let result = await supabase
@@ -395,11 +437,19 @@ app.get('/api/companies/:id', async (req, res) => {
   }
 });
 
-app.put('/api/companies/:id', async (req, res) => {
+app.put('/api/companies/:id', requireAuth, async (req, res) => {
   try {
+    // Contractors can only update their own record; admins can update any
+    if (req.user.role !== 'admin' && req.user.id !== req.params.id) {
+      return res.status(403).json({ error: 'You can only update your own company' });
+    }
     const updates = { ...req.body, updated_at: new Date().toISOString() };
     delete updates.id;
     delete updates.password;
+    // Prevent contractors from setting their own credits
+    if (req.user.role !== 'admin') {
+      delete updates.credits;
+    }
 
     let result = await supabase
       .from('companies')
@@ -430,7 +480,7 @@ app.put('/api/companies/:id', async (req, res) => {
 // =====================
 // LEADS
 // =====================
-app.post('/api/leads', async (req, res) => {
+app.post('/api/leads', leadLimiter,, async (req, res) => {
   try {
     const { customerName, customerEmail, customerPhone, postcode, btu, roomType, propertyType, notes } = req.body;
 
@@ -460,7 +510,7 @@ app.post('/api/leads', async (req, res) => {
   }
 });
 
-app.get('/api/leads', async (req, res) => {
+app.get('/api/leads', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.query;
     let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
@@ -477,7 +527,7 @@ app.get('/api/leads', async (req, res) => {
   }
 });
 
-app.put('/api/leads/:id', async (req, res) => {
+app.put('/api/leads/:id', requireAuth, async (req, res) => {
   try {
     const updates = { ...req.body, updated_at: new Date().toISOString() };
     delete updates.id;
@@ -595,7 +645,7 @@ app.post('/api/confirm-payment', async (req, res) => {
 // =====================
 // ADMIN
 // =====================
-app.get('/api/admin/purchases', async (req, res) => {
+app.get('/api/admin/purchases', requireAdmin,, async (req, res) => {
   try {
     const { data: purchases, error } = await supabase
       .from('purchases')
@@ -608,7 +658,7 @@ app.get('/api/admin/purchases', async (req, res) => {
   }
 });
 
-app.get('/api/admin/stats', async (req, res) => {
+app.get('/api/admin/stats', requireAdmin,, async (req, res) => {
   try {
     const { data: purchases } = await supabase.from('purchases').select('*');
     const { count: totalCompanies } = await supabase.from('companies').select('*', { count: 'exact', head: true });
@@ -761,7 +811,7 @@ async function distributeLead(lead) {
 // =====================
 // CRM — PROSPECTS
 // =====================
-app.get('/api/prospects', async (req, res) => {
+app.get('/api/prospects', requireAdmin, async (req, res) => {
   try {
     const { data: prospects, error } = await supabase
       .from('prospects')
@@ -775,7 +825,7 @@ app.get('/api/prospects', async (req, res) => {
   }
 });
 
-app.post('/api/prospects', async (req, res) => {
+app.post('/api/prospects', requireAdmin, async (req, res) => {
   try {
     const { company, name, email, phone, city, postcode, status, notes } = req.body;
 
@@ -804,7 +854,7 @@ app.post('/api/prospects', async (req, res) => {
   }
 });
 
-app.put('/api/prospects/:id', async (req, res) => {
+app.put('/api/prospects/:id', requireAdmin, async (req, res) => {
   try {
     const updates = { ...req.body, updated_at: new Date().toISOString(), last_contact: new Date().toISOString() };
     delete updates.id;
@@ -825,7 +875,7 @@ app.put('/api/prospects/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/prospects/:id', async (req, res) => {
+app.delete('/api/prospects/:id', requireAdmin, async (req, res) => {
   try {
     const { error } = await supabase
       .from('prospects')
@@ -842,7 +892,7 @@ app.delete('/api/prospects/:id', async (req, res) => {
 // =====================
 // CRM — TASKS
 // =====================
-app.get('/api/tasks', async (req, res) => {
+app.get('/api/tasks', requireAdmin, async (req, res) => {
   try {
     const { data: tasks, error } = await supabase
       .from('tasks')
@@ -856,7 +906,7 @@ app.get('/api/tasks', async (req, res) => {
   }
 });
 
-app.post('/api/tasks', async (req, res) => {
+app.post('/api/tasks', requireAdmin, async (req, res) => {
   try {
     const { title, description, dueDate, prospectId } = req.body;
 
@@ -882,7 +932,7 @@ app.post('/api/tasks', async (req, res) => {
   }
 });
 
-app.put('/api/tasks/:id', async (req, res) => {
+app.put('/api/tasks/:id', requireAdmin, async (req, res) => {
   try {
     const updates = { ...req.body, updated_at: new Date().toISOString() };
     delete updates.id;
@@ -903,7 +953,7 @@ app.put('/api/tasks/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/tasks/:id', async (req, res) => {
+app.delete('/api/tasks/:id', requireAdmin, async (req, res) => {
   try {
     const { error } = await supabase
       .from('tasks')
@@ -931,7 +981,7 @@ app.get('/api/push/vapid-key', (req, res) => {
 });
 
 // Subscribe to push notifications
-app.post('/api/push/subscribe', async (req, res) => {
+app.post('/api/push/subscribe', requireAuth, async (req, res) => {
   try {
     const { companyId, subscription } = req.body;
 
@@ -962,7 +1012,7 @@ app.post('/api/push/subscribe', async (req, res) => {
 });
 
 // Unsubscribe from push notifications
-app.post('/api/push/unsubscribe', async (req, res) => {
+app.post('/api/push/unsubscribe', requireAuth, async (req, res) => {
   try {
     const { companyId } = req.body;
 
@@ -989,7 +1039,7 @@ app.post('/api/push/unsubscribe', async (req, res) => {
 });
 
 // Send push notification to a specific contractor
-app.post('/api/push/notify', async (req, res) => {
+app.post('/api/push/notify', requireAuth, async (req, res) => {
   try {
     const { companyId, title, body, url, tag } = req.body;
 
@@ -1055,6 +1105,98 @@ async function sendPushToCompany(companyId, { title, body, url, tag }) {
     return { success: false, reason: err.message };
   }
 }
+
+// =====================
+// STRIPE WEBHOOK (secure payment verification)
+// =====================
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: 'Stripe not configured' });
+  }
+
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error('STRIPE_WEBHOOK_SECRET not set');
+    return res.status(500).json({ error: 'Webhook not configured' });
+  }
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).json({ error: 'Invalid signature' });
+  }
+
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object;
+    const { companyId, credits, packageId, isFirstPurchase } = paymentIntent.metadata;
+
+    if (!companyId || !credits) {
+      console.error('Missing metadata in payment intent:', paymentIntent.id);
+      return res.json({ received: true });
+    }
+
+    try {
+      // Get current company
+      const { data: company, error: fetchError } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', companyId)
+        .single();
+
+      if (fetchError || !company) {
+        console.error('Company not found for webhook:', companyId);
+        return res.json({ received: true });
+      }
+
+      // Update credits
+      const newCredits = (company.credits || 0) + parseInt(credits);
+      await supabase
+        .from('companies')
+        .update({
+          credits: newCredits,
+          has_purchased: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', companyId);
+
+      // Record purchase
+      await supabase
+        .from('purchases')
+        .insert({
+          company_id: companyId,
+          package_name: packageId || 'unknown',
+          credits: parseInt(credits),
+          amount: paymentIntent.amount / 100,
+          status: 'completed',
+          stripe_payment_id: paymentIntent.id
+        });
+
+      // Send receipt email
+      if (resend) {
+        try {
+          await resend.emails.send({
+            from: 'ACConnx <receipts@acconnx.com>',
+            to: company.email,
+            subject: 'Payment Confirmation - ACConnx',
+            html: `<h1>Thank you for your purchase!</h1><p>You bought ${credits} credits for £${(paymentIntent.amount / 100).toFixed(2)}.</p><p>Your new balance: ${newCredits} credits</p><p><a href="https://acconnx.com/company-portal.html">View Dashboard</a></p>`
+          });
+        } catch (e) {
+          console.log('Failed to send receipt:', e.message);
+        }
+      }
+
+      console.log(`✅ Webhook: Added ${credits} credits to company ${companyId}`);
+    } catch (err) {
+      console.error('Webhook processing error:', err);
+    }
+  }
+
+  res.json({ received: true });
+});
 
 // =====================
 // START SERVER
