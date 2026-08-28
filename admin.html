@@ -602,20 +602,31 @@
 
 <script>
 // =====================
-// ADMIN AUTH
+// ADMIN AUTH — server-side via API
 // =====================
-const ADMIN_PASSWORD = 'acconnx2026';
 
-function attemptLogin(e) {
+async function attemptLogin(e) {
   e.preventDefault();
   const input = document.getElementById('adminPassword').value;
-  if (input === ADMIN_PASSWORD) {
-    sessionStorage.setItem('acconnx_admin_auth', 'true');
-    showAdmin();
-  } else {
+  try {
+    const res = await fetch('https://acconnx.com/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: input })
+    });
+    const data = await res.json();
+    if (data.success && data.token) {
+      sessionStorage.setItem('acconnx_admin_token', data.token);
+      showAdmin();
+    } else {
+      document.getElementById('loginError').style.display = 'block';
+      document.getElementById('adminPassword').value = '';
+      document.getElementById('adminPassword').focus();
+    }
+  } catch (err) {
+    console.error('Admin login failed:', err);
+    document.getElementById('loginError').textContent = 'Login failed. Please try again.';
     document.getElementById('loginError').style.display = 'block';
-    document.getElementById('adminPassword').value = '';
-    document.getElementById('adminPassword').focus();
   }
   return false;
 }
