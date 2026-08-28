@@ -1,8 +1,10 @@
 // JWT Authentication Middleware
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'acconnx-jwt-secret-change-in-production';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'change-this-admin-password';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) { console.error('❌ JWT_SECRET environment variable is required'); process.exit(1); }
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+if (!ADMIN_PASSWORD) { console.error('❌ ADMIN_PASSWORD environment variable is required'); process.exit(1); }
 
 // Generate JWT token for a company
 function generateToken(company) {
@@ -57,4 +59,4 @@ function requireAdmin(req, res, next) {
   }
 }
 
-module.exports = { generateToken, generateAdminToken, requireAuth, requireAdmin, JWT_SECRET, ADMIN_PASSWORD };
+module.exports = { generateToken, generateAdminToken, requireAuth, requireAdmin };

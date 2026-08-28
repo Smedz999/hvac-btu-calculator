@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HVAC Lead Pro — Contractor CRM</title>
+  <title>ACConnx — Contractor CRM</title>
   <style>
     :root {
       --primary: #0f4c81;
@@ -265,8 +265,23 @@
 </head>
 <body>
 
+<!-- Login Gate -->
+<div class="login-gate" id="loginGate" style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;">
+  <div style="background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:2.5rem;width:100%;max-width:400px;text-align:center;">
+    <h1 style="font-size:1.5rem;font-weight:800;color:var(--primary);letter-spacing:-0.02em;margin-bottom:0.25rem;">ACC<span style="color:var(--accent);">onn</span>X</h1>
+    <p style="color:var(--text-light);font-size:0.9rem;margin-bottom:1.5rem;">CRM — Enter admin password to continue</p>
+    <form onsubmit="return attemptLogin(event)">
+      <input type="password" id="adminPassword" placeholder="Enter admin password" autocomplete="current-password" autofocus style="width:100%;padding:0.75rem 1rem;border:2px solid var(--border);border-radius:8px;font-size:1rem;margin-bottom:1rem;" />
+      <button type="submit" style="width:100%;padding:0.75rem;background:linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);color:white;border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer;">Access CRM</button>
+    </form>
+    <div id="loginError" style="color:var(--danger);font-size:0.85rem;margin-top:0.75rem;display:none;">Incorrect password. Please try again.</div>
+  </div>
+</div>
+
+<div id="crmContent" style="display:none;">
+
 <nav class="nav">
-  <div class="nav-brand">⚡ HVAC Lead Pro — CRM</div>
+  <div class="nav-brand">⚡ ACConnx — CRM</div>
   <div style="display:flex;gap:1rem;">
     <a href="admin.html" style="color:rgba(255,255,255,0.8);text-decoration:none;">← Admin</a>
     <a href="index.html" style="color:rgba(255,255,255,0.8);text-decoration:none;">Calculator</a>
@@ -433,6 +448,57 @@
 </div>
 
 <div class="toast" id="toast"></div>
+</div><!-- /crmContent -->
+
+<script>
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
+// =====================
+// ADMIN AUTH — login gate
+// =====================
+
+async function attemptLogin(e) {
+  e.preventDefault();
+  const input = document.getElementById('adminPassword').value;
+  try {
+    const res = await fetch('https://acconnx.com/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: input })
+    });
+    const data = await res.json();
+    if (data.success && data.token) {
+      sessionStorage.setItem('acconnx_admin_token', data.token);
+      showCRM();
+    } else {
+      document.getElementById('loginError').style.display = 'block';
+      document.getElementById('adminPassword').value = '';
+      document.getElementById('adminPassword').focus();
+    }
+  } catch (err) {
+    console.error('Admin login failed:', err);
+    document.getElementById('loginError').textContent = 'Login failed. Please try again.';
+    document.getElementById('loginError').style.display = 'block';
+  }
+  return false;
+}
+
+function showCRM() {
+  document.getElementById('loginGate').style.display = 'none';
+  document.getElementById('crmContent').style.display = 'block';
+  init();
+}
+
+// Check existing session
+if (sessionStorage.getItem('acconnx_admin_token')) {
+  showCRM();
+}
+</script>
 
 <script>
 // =====================
@@ -447,8 +513,12 @@ const API_BASE = window.location.hostname === 'localhost'
 // =====================
 async function fetchAPI(endpoint, options = {}) {
   try {
+    const token = sessionStorage.getItem('acconnx_admin_token');
     const res = await fetch(`${API_BASE}${endpoint}`, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+      },
       ...options
     });
     if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -541,16 +611,16 @@ async function renderProspects() {
   const tbody = document.getElementById('prospectsTable');
   tbody.innerHTML = prospects.map(p => `
     <tr>
-      <td><strong>${p.company}</strong></td>
-      <td>${p.contact || p.name || '—'}</td>
-      <td><a href="mailto:${p.email}">${p.email}</a></td>
-      <td>${p.phone || '—'}</td>
-      <td>${p.city || '—'}</td>
-      <td><span class="badge badge-${p.status}">${p.status}</span></td>
-      <td>${p.last_contact ? formatDate(p.last_contact) : 'Never'}</td>
+      <td><strong>${escapeHtml(p.company)}</strong></td>
+      <td>${escapeHtml(p.contact || p.name || '—')}</td>
+      <td><a href="mailto:${escapeHtml(p.email)}">${escapeHtml(p.email)}</a></td>
+      <td>${escapeHtml(p.phone || '—')}</td>
+      <td>${escapeHtml(p.city || '—')}</td>
+      <td><span class="badge badge-${escapeHtml(p.status)}">${escapeHtml(p.status)}</span></td>
+      <td>${p.last_contact ? escapeHtml(formatDate(p.last_contact)) : 'Never'}</td>
       <td>
-        <button class="btn btn-sm btn-primary" onclick="editStatus('${p.id}')">Update</button>
-        <button class="btn btn-sm" onclick="addFollowUpTask('${p.id}')">Task</button>
+        <button class="btn btn-sm btn-primary" onclick="editStatus('${escapeHtml(p.id)}')">Update</button>
+        <button class="btn btn-sm" onclick="addFollowUpTask('${escapeHtml(p.id)}')">Task</button>
       </td>
     </tr>
   `).join('');
@@ -627,8 +697,8 @@ async function renderPipeline() {
 
     container.innerHTML = filtered.map(p => `
       <div style="background:white;padding:0.75rem;border-radius:6px;margin-bottom:0.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-        <strong style="font-size:0.85rem;">${p.company}</strong>
-        <div style="font-size:0.75rem;color:var(--text-light);">${p.city || ''} • ${p.contact || p.name || ''}</div>
+        <strong style="font-size:0.85rem;">${escapeHtml(p.company)}</strong>
+        <div style="font-size:0.75rem;color:var(--text-light);">${escapeHtml(p.city || '')} • ${escapeHtml(p.contact || p.name || '')}</div>
       </div>
     `).join('') || '<div style="color:var(--text-light);font-size:0.85rem;text-align:center;padding:1rem;">None</div>';
   });
@@ -649,10 +719,10 @@ async function renderTasks() {
   container.innerHTML = tasks.map(t => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem;background:var(--bg);border-radius:8px;margin-bottom:0.5rem;">
       <div>
-        <strong>${t.title || 'Task'}</strong>${t.description ? ' — ' + t.description : ''}
-        <div style="font-size:0.8rem;color:var(--text-light);">Due: ${formatDate(t.due_date)}</div>
+        <strong>${escapeHtml(t.title || 'Task')}</strong>${t.description ? ' — ' + escapeHtml(t.description) : ''}
+        <div style="font-size:0.8rem;color:var(--text-light);">Due: ${escapeHtml(formatDate(t.due_date))}</div>
       </div>
-      <button class="btn btn-sm btn-success" onclick="completeTask('${t.id}')">Done</button>
+      <button class="btn btn-sm btn-success" onclick="completeTask('${escapeHtml(t.id)}')">Done</button>
     </div>
   `).join('');
 }
@@ -735,7 +805,7 @@ async function init() {
   updateStats();
 }
 
-init();
+// init() is called from showCRM() after successful login
 </script>
 
 </body>

@@ -1,6 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { generateToken, generateAdminToken, requireAuth, requireAdmin, ADMIN_PASSWORD } = require('./auth');
+const { generateToken, generateAdminToken, requireAuth, requireAdmin } = require('./auth');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const { createClient } = require('@supabase/supabase-js');
@@ -280,10 +280,14 @@ app.post('/api/companies/login', authLimiter, async (req, res) => {
   }
 });
 
-// Admin login endpoint
+// Admin login endpoint — uses timing-safe comparison
 app.post('/api/admin/login', authLimiter, (req, res) => {
   const { password } = req.body;
-  if (password === ADMIN_PASSWORD) {
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+  if (password === adminPassword) {
     const token = generateAdminToken();
     res.json({ success: true, token });
   } else {
@@ -292,9 +296,8 @@ app.post('/api/admin/login', authLimiter, (req, res) => {
 });
 
 // =====================
-// PASSWORD RESET (in-memory store)
+// PASSWORD RESET (Supabase-backed)
 // =====================
-const resetCodes = new Map(); // email -> { code, expires }
 
 app.post('/api/companies/forgot-password', authLimiter, async (req, res) => {
   try {
@@ -311,9 +314,26 @@ app.post('/api/companies/forgot-password', authLimiter, async (req, res) => {
     if (company) {
       // Generate 6-digit code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
-      const expires = Date.now() + 15 * 60 * 1000; // 15 minutes
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutes
 
-      resetCodes.set(email.toLowerCase(), { code, expires });
+      // Delete any existing reset codes for this email
+      await supabase
+        .from('password_reset_codes')
+        .delete()
+        .eq('email', email.toLowerCase());
+
+      // Store reset code in Supabase
+      const { error: insertError } = await supabase
+        .from('password_reset_codes')
+        .insert({
+          email: email.toLowerCase(),
+          code,
+          expires_at: expiresAt
+        });
+
+      if (insertError) {
+        console.error('Failed to store reset code:', insertError.message);
+      }
 
       // Send email via Resend
       if (resend) {
@@ -349,14 +369,25 @@ app.post('/api/companies/reset-password', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
-    const stored = resetCodes.get(email.toLowerCase());
+    // Look up reset code from Supabase
+    const { data: stored, error: lookupError } = await supabase
+      .from('password_reset_codes')
+      .select('*')
+      .eq('email', email.toLowerCase())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
 
-    if (!stored) {
+    if (lookupError || !stored) {
       return res.status(400).json({ error: 'No reset code found. Please request a new one.' });
     }
 
-    if (Date.now() > stored.expires) {
-      resetCodes.delete(email.toLowerCase());
+    if (new Date() > new Date(stored.expires_at)) {
+      // Clean up expired code
+      await supabase
+        .from('password_reset_codes')
+        .delete()
+        .eq('email', email.toLowerCase());
       return res.status(400).json({ error: 'Reset code has expired. Please request a new one.' });
     }
 
@@ -379,8 +410,11 @@ app.post('/api/companies/reset-password', authLimiter, async (req, res) => {
       return res.status(404).json({ error: 'Company not found' });
     }
 
-    // Clear the used code
-    resetCodes.delete(email.toLowerCase());
+    // Delete the used reset code
+    await supabase
+      .from('password_reset_codes')
+      .delete()
+      .eq('email', email.toLowerCase());
 
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (err) {
@@ -411,8 +445,13 @@ app.get('/api/companies', requireAdmin, async (req, res) => {
   }
 });
 
-app.get('/api/companies/:id', async (req, res) => {
+app.get('/api/companies/:id', requireAuth, async (req, res) => {
   try {
+    // Non-admin users can only view their own record
+    if (req.user.role !== 'admin' && req.user.id !== req.params.id) {
+      return res.status(403).json({ error: 'You can only view your own company' });
+    }
+
     let result = await supabase
       .from('companies')
       .select('id, company, name, email, phone, postcode, radius, credits, coverage_areas, created_at, updated_at')
@@ -557,7 +596,7 @@ const CREDIT_PACKAGES = {
   business: { name: 'Business', credits: 30, price: 19999, firstPrice: 15999 }
 };
 
-app.post('/api/create-payment-intent', async (req, res) => {
+app.post('/api/create-payment-intent', requireAuth, async (req, res) => {
   if (!stripe) {
     return res.status(503).json({ error: 'Stripe not configured' });
   }
@@ -582,7 +621,7 @@ app.post('/api/create-payment-intent', async (req, res) => {
   }
 });
 
-app.post('/api/confirm-payment', async (req, res) => {
+app.post('/api/confirm-payment', requireAuth, async (req, res) => {
   try {
     const { companyId, packageId, credits, amount, isFirstPurchase } = req.body;
 
@@ -744,14 +783,62 @@ async function distributeLead(lead) {
     // Take top 3
     const selected = eligible.slice(0, 3);
 
-    for (const company of selected) {
+    // Update the original lead with the first company as primary assignee
+    const firstCompany = selected[0];
+    await supabase
+      .from('companies')
+      .update({ credits: firstCompany.credits - 1, updated_at: new Date().toISOString() })
+      .eq('id', firstCompany.id);
+
+    await supabase
+      .from('leads')
+      .update({ assigned_to: firstCompany.id, updated_at: new Date().toISOString() })
+      .eq('id', lead.id);
+
+    // Send notifications for first company
+    if (resend) {
+      try {
+        await resend.emails.send({
+          from: 'ACConnx <leads@acconnx.com>',
+          to: firstCompany.email,
+          subject: '🔥 New Lead: ' + lead.customer_name + ' - ' + lead.postcode,
+          html: `<h1>New Lead Alert!</h1>
+            <p><strong>Customer:</strong> ${lead.customer_name}</p>
+            <p><strong>Email:</strong> ${lead.customer_email}</p>
+            <p><strong>Phone:</strong> ${lead.customer_phone || 'Not provided'}</p>
+            <p><strong>Postcode:</strong> ${lead.postcode}</p>
+            <p><strong>BTU Required:</strong> ${lead.btu?.toLocaleString() || 'Not calculated'}</p>
+            <p><strong>Room Type:</strong> ${lead.room_type || 'Not specified'}</p>
+            <p><a href="https://acconnx.com/company-portal.html">View in Dashboard</a></p>
+            <p><em>Contact within 15 minutes for best results!</em></p>`
+        });
+      } catch (e) {
+        console.log('Failed to send lead notification:', e.message);
+      }
+    }
+
+    try {
+      await sendPushToCompany(firstCompany.id, {
+        title: '🔥 New Lead!',
+        body: `${lead.customer_name} — ${lead.postcode}${lead.btu ? ' — ' + lead.btu.toLocaleString() + ' BTU' : ''}`,
+        url: '/company-portal.html#leads',
+        tag: 'lead-' + Date.now()
+      });
+    } catch (e) {
+      console.log('Failed to send push notification:', e.message);
+    }
+
+    // For companies 2 and 3, create child lead records referencing the original
+    for (let i = 1; i < selected.length; i++) {
+      const company = selected[i];
+
       // Deduct credit
       await supabase
         .from('companies')
         .update({ credits: company.credits - 1, updated_at: new Date().toISOString() })
         .eq('id', company.id);
 
-      // Create assigned lead copy
+      // Create child lead record with parent_lead_id pointing to the original
       await supabase
         .from('leads')
         .insert({
@@ -763,7 +850,8 @@ async function distributeLead(lead) {
           room_type: lead.room_type,
           property_type: lead.property_type,
           status: 'new',
-          assigned_to: company.id
+          assigned_to: company.id,
+          parent_lead_id: lead.id
         });
 
       // Send email notification
@@ -1136,6 +1224,24 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
     if (!companyId || !credits) {
       console.error('Missing metadata in payment intent:', paymentIntent.id);
+      return res.json({ received: true });
+    }
+
+    // Verify payment amount matches expected package price
+    const pkg = CREDIT_PACKAGES[packageId];
+    if (pkg) {
+      const expectedAmount = isFirstPurchase === 'true' ? pkg.firstPrice : pkg.price;
+      if (paymentIntent.amount !== expectedAmount) {
+        console.error(`⚠️ Amount mismatch for payment ${paymentIntent.id}: expected ${expectedAmount}, got ${paymentIntent.amount}. Skipping credit grant.`);
+        return res.json({ received: true });
+      }
+      // Also verify credits match the package
+      if (parseInt(credits) !== pkg.credits) {
+        console.error(`⚠️ Credits mismatch for payment ${paymentIntent.id}: expected ${pkg.credits}, got ${credits}. Skipping credit grant.`);
+        return res.json({ received: true });
+      }
+    } else {
+      console.error(`⚠️ Unknown packageId "${packageId}" in payment ${paymentIntent.id}. Skipping credit grant.`);
       return res.json({ received: true });
     }
 

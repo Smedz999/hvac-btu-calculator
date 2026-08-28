@@ -601,6 +601,13 @@
 </div><!-- /adminContent -->
 
 <script>
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
 // =====================
 // ADMIN AUTH — server-side via API
 // =====================
@@ -644,6 +651,13 @@ if (sessionStorage.getItem('acconnx_admin_token')) {
 </script>
 
 <script>
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
 // =====================
 // API CONFIG
 // =====================
@@ -770,13 +784,13 @@ function renderLeads() {
       <tr>
         <td>${formatDate(lead.created_at)}</td>
         <td>
-          <strong>${lead.customer_name || 'Unknown'}</strong>
-          <div style="font-size:0.8rem;color:var(--text-light);">${lead.customer_email || ''}</div>
+          <strong>${escapeHtml(lead.customer_name || 'Unknown')}</strong>
+          <div style="font-size:0.8rem;color:var(--text-light);">${escapeHtml(lead.customer_email || '')}</div>
         </td>
-        <td>${lead.postcode || '—'}</td>
-        <td>${lead.btu ? lead.btu.toLocaleString() : '—'}</td>
-        <td>${company ? company.company : '<span style="color:var(--text-light);">Unassigned</span>'}</td>
-        <td><span class="badge badge-${lead.status || 'new'}">${lead.status || 'new'}</span></td>
+        <td>${escapeHtml(lead.postcode || '—')}</td>
+        <td>${lead.btu ? escapeHtml(lead.btu.toLocaleString()) : '—'}</td>
+        <td>${company ? escapeHtml(company.company) : '<span style="color:var(--text-light);">Unassigned</span>'}</td>
+        <td><span class="badge badge-${escapeHtml(lead.status || 'new')}">${escapeHtml(lead.status || 'new')}</span></td>
       </tr>
     `;
   }).join('');
@@ -813,13 +827,13 @@ function renderCompanies() {
     const companyLeads = leads.filter(l => l.assigned_to === company.id);
     return `
       <tr>
-        <td><strong>${company.company}</strong></td>
-        <td>${company.name}</td>
-        <td>${company.email}</td>
-        <td>${company.phone || '—'}</td>
-        <td>${company.postcode}</td>
-        <td>${company.fgas_number || '<span style="color:var(--text-light);">—</span>'}</td>
-        <td><strong>${company.credits || 0}</strong> <button class="add-credits-btn" onclick="addCredits(${company.id}, '${company.company.replace(/'/g, "\\'")}')" title="Add credits">+</button></td>
+        <td><strong>${escapeHtml(company.company)}</strong></td>
+        <td>${escapeHtml(company.name)}</td>
+        <td>${escapeHtml(company.email)}</td>
+        <td>${escapeHtml(company.phone || '—')}</td>
+        <td>${escapeHtml(company.postcode)}</td>
+        <td>${company.fgas_number ? escapeHtml(company.fgas_number) : '<span style="color:var(--text-light);">—</span>'}</td>
+        <td><strong>${escapeHtml(String(company.credits || 0))}</strong> <button class="add-credits-btn" data-company-id="${escapeHtml(String(company.id))}" data-company-name="${escapeHtml(company.company)}" title="Add credits">+</button></td>
         <td>${companyLeads.length}</td>
         <td>${formatDate(company.created_at)}</td>
       </tr>
@@ -847,11 +861,11 @@ function renderPurchases() {
     return `
       <tr>
         <td>${formatDate(p.created_at)}</td>
-        <td>${company ? company.company : 'Unknown'}</td>
-        <td>${p.package_name || '—'}</td>
-        <td>${p.credits}</td>
-        <td><strong>£${parseFloat(p.amount || 0).toFixed(2)}</strong></td>
-        <td><span class="badge badge-${p.status || 'completed'}">${p.status || 'completed'}</span></td>
+        <td>${company ? escapeHtml(company.company) : 'Unknown'}</td>
+        <td>${escapeHtml(p.package_name || '—')}</td>
+        <td>${escapeHtml(String(p.credits))}</td>
+        <td><strong>£${escapeHtml(parseFloat(p.amount || 0).toFixed(2))}</strong></td>
+        <td><span class="badge badge-${escapeHtml(p.status || 'completed')}">${escapeHtml(p.status || 'completed')}</span></td>
       </tr>
     `;
   }).join('');
@@ -883,11 +897,11 @@ function renderAnalytics() {
     const pct = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
     statusHtml += `
       <div style="display:flex;align-items:center;gap:1rem;">
-        <span class="badge" style="background:${statusColors[status] || '#e2e8f0'};color:${statusTextColors[status] || '#64748b'};min-width:80px;text-align:center;">${statusLabels[status] || status}</span>
+        <span class="badge" style="background:${statusColors[status] || '#e2e8f0'};color:${statusTextColors[status] || '#64748b'};min-width:80px;text-align:center;">${escapeHtml(statusLabels[status] || status)}</span>
         <div style="flex:1;background:var(--bg);border-radius:8px;height:24px;overflow:hidden;">
           <div style="width:${pct}%;background:${statusTextColors[status] || '#64748b'};height:100%;border-radius:8px;transition:width 0.5s;"></div>
         </div>
-        <span style="font-weight:700;min-width:60px;text-align:right;">${count} (${pct}%)</span>
+        <span style="font-weight:700;min-width:60px;text-align:right;">${escapeHtml(String(count))} (${pct}%)</span>
       </div>
     `;
   });
@@ -911,8 +925,8 @@ function renderAnalytics() {
       <div style="display:flex;align-items:center;gap:1rem;padding:0.75rem;background:var(--bg);border-radius:8px;">
         <span style="font-weight:800;color:var(--accent-dark);min-width:24px;">#${i + 1}</span>
         <div style="flex:1;">
-          <strong>${c.company}</strong>
-          <div style="font-size:0.8rem;color:var(--text-light);">${c.leadCount} leads • ${c.wonCount} won</div>
+          <strong>${escapeHtml(c.company)}</strong>
+          <div style="font-size:0.8rem;color:var(--text-light);">${escapeHtml(String(c.leadCount))} leads • ${escapeHtml(String(c.wonCount))} won</div>
         </div>
         <span style="font-weight:700;color:var(--success);">${convRate}%</span>
       </div>
@@ -931,8 +945,8 @@ function renderAnalytics() {
     const company = cachedCompanies.find(c => c.id === l.assigned_to);
     activityHtml += `
       <div style="padding:0.75rem;background:var(--bg);border-radius:8px;font-size:0.9rem;">
-        <strong>${l.customer_name || 'Lead'}</strong> from ${l.postcode || 'unknown'}
-        ${company ? `→ assigned to <strong>${company.company}</strong>` : '→ <span style="color:var(--warning);">unassigned</span>'}
+        <strong>${escapeHtml(l.customer_name || 'Lead')}</strong> from ${escapeHtml(l.postcode || 'unknown')}
+        ${company ? `→ assigned to <strong>${escapeHtml(company.company)}</strong>` : '→ <span style="color:var(--warning);">unassigned</span>'}
         <span style="color:var(--text-light);float:right;">${formatDate(l.created_at)}</span>
       </div>
     `;
@@ -942,14 +956,22 @@ function renderAnalytics() {
 }
 
 // =====================
-// ADD CREDITS
+// ADD CREDITS — event delegation (no inline onclick with string interpolation)
 // =====================
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('add-credits-btn')) {
+    const companyId = e.target.getAttribute('data-company-id');
+    const companyName = e.target.getAttribute('data-company-name');
+    addCredits(companyId, companyName);
+  }
+});
+
 async function addCredits(companyId, companyName) {
   const amount = prompt(`Add credits to ${companyName}:\n\nEnter number of credits to add:`);
   if (!amount || isNaN(amount) || parseInt(amount) <= 0) return;
 
   const credits = parseInt(amount);
-  const company = cachedCompanies.find(c => c.id === companyId);
+  const company = cachedCompanies.find(c => String(c.id) === String(companyId));
   if (!company) return;
 
   const newCredits = (company.credits || 0) + credits;

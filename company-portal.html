@@ -940,6 +940,13 @@
 <div class="toast" id="toast"></div>
 
 <script>
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
 // =====================
 // CONFIG
 // =====================
@@ -1214,10 +1221,10 @@ async function loadDashboard() {
       recentContainer.innerHTML = recent.map(lead => `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 0;border-bottom:1px solid var(--border);">
           <div>
-            <strong>${lead.customer_name}</strong> — ${lead.postcode}
-            <div style="font-size:0.85rem;color:var(--text-light);">${formatBtu(lead.btu)} BTU • ${formatDate(lead.created_at)}</div>
+            <strong>${escapeHtml(lead.customer_name)}</strong> — ${escapeHtml(lead.postcode)}
+            <div style="font-size:0.85rem;color:var(--text-light);">${escapeHtml(formatBtu(lead.btu))} BTU • ${escapeHtml(formatDate(lead.created_at))}</div>
           </div>
-          <span class="badge badge-${lead.status}">${lead.status}</span>
+          <span class="badge badge-${escapeHtml(lead.status)}">${escapeHtml(lead.status)}</span>
         </div>
       `).join('');
     }
@@ -1275,13 +1282,13 @@ function renderLeadsTable(leadsToRender) {
   noMsg.style.display = 'none';
   tbody.innerHTML = leadsToRender.map(lead => `
     <tr>
-      <td>${formatDate(lead.created_at)}</td>
-      <td>${lead.customer_name}</td>
-      <td>${lead.postcode}</td>
-      <td>${formatBtu(lead.btu)} BTU</td>
-      <td><span class="badge badge-${lead.status}">${lead.status}</span></td>
+      <td>${escapeHtml(formatDate(lead.created_at))}</td>
+      <td>${escapeHtml(lead.customer_name)}</td>
+      <td>${escapeHtml(lead.postcode)}</td>
+      <td>${escapeHtml(formatBtu(lead.btu))} BTU</td>
+      <td><span class="badge badge-${escapeHtml(lead.status)}">${escapeHtml(lead.status)}</span></td>
       <td>
-        <button class="btn btn-sm btn-secondary" onclick="viewLead('${lead.id}')">View</button>
+        <button class="btn btn-sm btn-secondary" onclick="viewLead('${escapeHtml(lead.id)}')">View</button>
       </td>
     </tr>
   `).join('');
@@ -1324,38 +1331,38 @@ function viewLead(leadId) {
         <div class="lead-detail-grid">
           <div class="lead-detail-item">
             <label>Customer Name</label>
-            <p>${lead.customer_name}</p>
+            <p>${escapeHtml(lead.customer_name)}</p>
           </div>
           <div class="lead-detail-item">
             <label>Email</label>
-            <p><a href="mailto:${lead.customer_email}">${lead.customer_email}</a></p>
+            <p><a href="mailto:${escapeHtml(lead.customer_email)}">${escapeHtml(lead.customer_email)}</a></p>
           </div>
           <div class="lead-detail-item">
             <label>Phone</label>
-            <p>${lead.customer_phone || 'Not provided'}</p>
+            <p>${escapeHtml(lead.customer_phone || 'Not provided')}</p>
           </div>
           <div class="lead-detail-item">
             <label>Postcode</label>
-            <p>${lead.postcode}</p>
+            <p>${escapeHtml(lead.postcode)}</p>
           </div>
           <div class="lead-detail-item">
             <label>BTU Required</label>
-            <p>${formatBtu(lead.btu)} BTU</p>
+            <p>${escapeHtml(formatBtu(lead.btu))} BTU</p>
           </div>
           <div class="lead-detail-item">
             <label>Room Type</label>
-            <p>${lead.room_type || 'Not specified'}</p>
+            <p>${escapeHtml(lead.room_type || 'Not specified')}</p>
           </div>
           <div class="lead-detail-item">
             <label>Submitted</label>
-            <p>${formatDate(lead.created_at)}</p>
+            <p>${escapeHtml(formatDate(lead.created_at))}</p>
           </div>
         </div>
 
         <div class="status-buttons">
-          <button class="btn btn-sm ${lead.status === 'contacted' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${lead.id}', 'contacted')">Mark Contacted</button>
-          <button class="btn btn-sm ${lead.status === 'won' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${lead.id}', 'won')">Mark Won</button>
-          <button class="btn btn-sm ${lead.status === 'lost' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${lead.id}', 'lost')">Mark Lost</button>
+          <button class="btn btn-sm ${lead.status === 'contacted' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${escapeHtml(lead.id)}', 'contacted')">Mark Contacted</button>
+          <button class="btn btn-sm ${lead.status === 'won' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${escapeHtml(lead.id)}', 'won')">Mark Won</button>
+          <button class="btn btn-sm ${lead.status === 'lost' ? 'btn-primary' : 'btn-secondary'}" onclick="updateLeadStatus('${escapeHtml(lead.id)}', 'lost')">Mark Lost</button>
         </div>
       `;
 
@@ -1464,45 +1471,62 @@ async function processPayment() {
       document.getElementById('card-errors').textContent = result.error.message;
       showToast(result.error.message, 'error');
     } else {
-      // Payment successful - add credits immediately
+      // Payment successful — server webhook adds credits, just confirm and refresh
       paymentSucceeded = true;
-      currentUser.credits = (currentUser.credits || 0) + selectedPackage.credits;
-      currentUser.hasPurchased = true; // Mark that they've made first purchase
+      
+      // Confirm payment with server and wait for response
+      try {
+        const confirmRes = await fetch(`${API_URL}/confirm-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({
+            companyId: currentUser.id,
+            packageId: packageId,
+            credits: selectedPackage.credits,
+            amount: selectedPackage.price
+          })
+        });
+        
+        if (confirmRes.ok) {
+          const confirmData = await confirmRes.json();
+          // Update user from server response (server is source of truth for credits)
+          if (confirmData.company) {
+            currentUser = { ...currentUser, ...confirmData.company };
+          }
+        }
+      } catch (syncErr) {
+        console.log('Server sync failed, webhook will handle credit addition:', syncErr.message);
+      }
+      
+      // Refresh user data from server to get accurate credit count
+      try {
+        const userRes = await fetch(`${API_URL}/companies/${currentUser.id}`, { headers: authHeaders() });
+        if (userRes.ok) {
+          const freshUser = await userRes.json();
+          if (freshUser) {
+            currentUser = { ...currentUser, ...freshUser };
+          }
+        }
+      } catch (refreshErr) {
+        console.log('Failed to refresh user data:', refreshErr.message);
+      }
+      
+      currentUser.hasPurchased = true;
       updateCurrentUser();
       
-      // Save purchase to localStorage for tracking
+      // Save purchase to localStorage for tracking (use consistent field names)
       const purchases = JSON.parse(localStorage.getItem('hvac_purchases') || '[]');
-      const isFirstPurchase = !currentUser.hasPurchased;
       const amountPaid = isFirstPurchase ? selectedPackage.firstPriceDisplay : selectedPackage.priceDisplay;
       purchases.push({
         id: 'pur_' + Date.now(),
         companyId: currentUser.id,
-        package: selectedPackage.name,
+        package_name: selectedPackage.name,
         credits: selectedPackage.credits,
         amount: amountPaid,
         isFirstPurchase: isFirstPurchase,
-        createdAt: new Date().toISOString()
+        created_at: new Date().toISOString()
       });
       localStorage.setItem('hvac_purchases', JSON.stringify(purchases));
-      
-      // Try to sync with server (best effort - don't wait for response)
-      fetch(`${API_URL}/confirm-payment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId: currentUser.id,
-          packageId: packageId,
-          credits: selectedPackage.credits,
-          amount: selectedPackage.price
-        })
-      }).then(res => {
-        if (!res.ok) {
-          console.log('Server sync returned error status:', res.status);
-        }
-      }).catch(err => {
-        // Server sync failed but credits already added locally - ignore error
-        console.log('Server sync failed:', err.message);
-      });
       
       closePaymentModal();
       showToast(`Payment successful! ${selectedPackage.credits} credits added.`);
@@ -1541,10 +1565,10 @@ async function loadPurchaseHistory() {
       <tbody>
         ${purchases.slice().reverse().map(p => `
           <tr>
-            <td>${formatDate(p.created_at)}</td>
-            <td>${p.package_name}</td>
-            <td>${p.credits}</td>
-            <td>${p.amount}</td>
+            <td>${escapeHtml(formatDate(p.created_at))}</td>
+            <td>${escapeHtml(p.package_name)}</td>
+            <td>${escapeHtml(String(p.credits))}</td>
+            <td>${escapeHtml(p.amount)}</td>
           </tr>
         `).join('')}
       </tbody>
