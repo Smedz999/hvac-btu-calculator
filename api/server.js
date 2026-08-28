@@ -175,7 +175,7 @@ app.get('/api/health', async (req, res) => {
 // =====================
 // COMPANIES
 // =====================
-app.post('/api/companies/register', authLimiter,, async (req, res) => {
+app.post('/api/companies/register', authLimiter, async (req, res) => {
   try {
     const { company, name, email, phone, password, postcode, radius, fgas_number, coverage_areas } = req.body;
 
@@ -253,7 +253,7 @@ app.post('/api/companies/register', authLimiter,, async (req, res) => {
   }
 });
 
-app.post('/api/companies/login', authLimiter,, async (req, res) => {
+app.post('/api/companies/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -296,7 +296,7 @@ app.post('/api/admin/login', authLimiter, (req, res) => {
 // =====================
 const resetCodes = new Map(); // email -> { code, expires }
 
-app.post('/api/companies/forgot-password', authLimiter,, async (req, res) => {
+app.post('/api/companies/forgot-password', authLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required' });
@@ -337,7 +337,7 @@ app.post('/api/companies/forgot-password', authLimiter,, async (req, res) => {
   }
 });
 
-app.post('/api/companies/reset-password', authLimiter,, async (req, res) => {
+app.post('/api/companies/reset-password', authLimiter, async (req, res) => {
   try {
     const { email, code, newPassword } = req.body;
 
@@ -480,7 +480,7 @@ app.put('/api/companies/:id', requireAuth, async (req, res) => {
 // =====================
 // LEADS
 // =====================
-app.post('/api/leads', leadLimiter,, async (req, res) => {
+app.post('/api/leads', leadLimiter, async (req, res) => {
   try {
     const { customerName, customerEmail, customerPhone, postcode, btu, roomType, propertyType, notes } = req.body;
 
@@ -645,7 +645,7 @@ app.post('/api/confirm-payment', async (req, res) => {
 // =====================
 // ADMIN
 // =====================
-app.get('/api/admin/purchases', requireAdmin,, async (req, res) => {
+app.get('/api/admin/purchases', requireAdmin, async (req, res) => {
   try {
     const { data: purchases, error } = await supabase
       .from('purchases')
@@ -658,7 +658,7 @@ app.get('/api/admin/purchases', requireAdmin,, async (req, res) => {
   }
 });
 
-app.get('/api/admin/stats', requireAdmin,, async (req, res) => {
+app.get('/api/admin/stats', requireAdmin, async (req, res) => {
   try {
     const { data: purchases } = await supabase.from('purchases').select('*');
     const { count: totalCompanies } = await supabase.from('companies').select('*', { count: 'exact', head: true });
