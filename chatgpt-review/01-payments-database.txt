@@ -1,0 +1,978 @@
+================================================================================
+FILE: api/migrations/003-payment-reservation-architecture.sql
+PURPOSE: Complete payment reservation architecture migration (append-only, idempotent)
+CONTAINS: Tables, CHECK constraints, indexes, triggers, all RPC functions, RLS, grants
+UPDATED: 2026-08-31 — Final production package catalogue (starter/5/4999, professional/15/12999, business/30/19999)
+================================================================================
+
+-- 003-payment-reservation-architecture.sql
+-- Append-only migration for payment reservation architecture
+-- Adapted for EXISTING custom JWT architecture (NOT Supabase Auth)
+-- companies.id is BIGINT, purchases.id is BIGINT, purchases.company_id is BIGINT
+-- Idempotent: safe to run multiple times
+--
+-- Sources:
+--   02-database-tables.md  — table schemas, CHECK constraints, indexes, transition trigger
+--   03-rls-permissions.md  — RLS policies, GRANT/REVOKE (adapted for custom JWT)
+--   04-payment-rpcs.md     — payment RPC functions
+--   06-reservations-discounts.md — migration strategy
+--   07-receipt-jobs.md     — receipt RPC functions
+
+-- ============================================================
+-- Step 1: Create new tables (BIGINT company_id to match existing)
+-- ============================================================
+
+-- 1a. payment_reservations
+CREATE TABLE IF NOT EXISTS payment_reservations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  company_id BIGINT NOT NULL REFERENCES companies(id),
+  package_id TEXT NOT NULL,
+  credits INTEGER NOT NULL CHECK (credits > 0),
+  amount_pence INTEGER NOT NULL CHECK (amount_pence > 0),
+  currency TEXT NOT NULL DEFAULT 'gbp' CHECK (currency = 'gbp'),
+  is_first_purchase BOOLEAN NOT NULL DEFAULT FALSE,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'succeeded', 'cancelled', 'expired')),
+  stripe_payment_intent_id TEXT UNIQUE,
+  balance_after INTEGER CHECK (balance_after >= 0),
+  receipt_sent_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '24 hours')
+);
+
+-- 1b. credit_packages
+CREATE TABLE IF NOT EXISTS credit_packages (
+  id TEXT PRIMARY KEY,
+  credits INTEGER NOT NULL CHECK (credits > 0),
+  price_pence INTEGER NOT NULL CHECK (price_pence > 0),
+  first_purchase_discount_percent INTEGER NOT NULL DEFAULT 0 CHECK (first_purchase_discount_percent >= 0 AND first_purchase_discount_percent <= 100),
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 1c. credit_ledger
+CREATE TABLE IF NOT EXISTS credit_ledger (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  company_id BIGINT NOT NULL REFERENCES companies(id),
+  change_amount INTEGER NOT NULL,
+  balance_after INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  reference_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 1d. receipt_outbox
+CREATE TABLE IF NOT EXISTS receipt_outbox (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  reservation_id UUID NOT NULL REFERENCES payment_reservations(id) UNIQUE,
+  company_id BIGINT NOT NULL REFERENCES companies(id),
+  credits_added INTEGER NOT NULL,
+  amount_pence INTEGER NOT NULL,
+  balance_after INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'sent', 'failed')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_attempt_at TIMESTAMPTZ,
+  sent_at TIMESTAMPTZ,
+  provider_message_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT sent_requires_sent_at CHECK (
+    status != 'sent' OR sent_at IS NOT NULL
+  ),
+  CONSTRAINT processing_requires_last_attempt CHECK (
+    status != 'processing' OR last_attempt_at IS NOT NULL
+  )
+);
+
+-- NOTE: company_members table is NOT created.
+-- The application uses custom JWTs (not Supabase Auth), so company_id
+-- is resolved directly from the JWT via requireAuth middleware.
+-- No company_members mapping table is needed.
+
+-- ============================================================
+-- Step 2: Modify companies table (additive only)
+-- ============================================================
+
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS has_purchased BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Historical backfill: mark companies with completed purchases as has_purchased = TRUE
+-- Idempotent: only sets FALSE -> TRUE, never resets TRUE -> FALSE
+-- Uses the existing purchases table with status = 'completed' (the legacy successful status)
+UPDATE companies
+SET has_purchased = TRUE
+WHERE has_purchased = FALSE
+  AND EXISTS (
+    SELECT 1 FROM purchases
+    WHERE purchases.company_id = companies.id
+      AND purchases.status = 'completed'
+  );
+
+-- ============================================================
+-- Step 3: Modify purchases table (additive only — preserve existing data)
+-- ============================================================
+
+-- Add new columns needed by the payment architecture.
+-- Existing columns (package_name, amount, stripe_payment_id) are preserved.
+-- New columns are nullable initially so existing rows remain valid.
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS package_id TEXT;
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS amount_pence INTEGER;
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'gbp';
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS stripe_payment_intent_id TEXT;
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS is_first_purchase BOOLEAN DEFAULT FALSE;
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS reservation_id UUID;
+
+-- Add unique constraint on stripe_payment_intent_id for idempotency
+-- (nullable, so existing rows with NULL are fine)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'purchases_stripe_pi_unique'
+  ) THEN
+    ALTER TABLE purchases ADD CONSTRAINT purchases_stripe_pi_unique UNIQUE (stripe_payment_intent_id);
+  END IF;
+END $$;
+
+-- ============================================================
+-- Step 4: Seed credit_packages data
+-- ============================================================
+
+INSERT INTO credit_packages (id, credits, price_pence, first_purchase_discount_percent) VALUES
+  ('starter', 5, 4999, 20),
+  ('professional', 15, 12999, 20),
+  ('business', 30, 19999, 20)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- Step 5: CHECK constraints (state shape constraints on payment_reservations)
+-- ============================================================
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'pending_shape') THEN
+    ALTER TABLE payment_reservations ADD CONSTRAINT pending_shape CHECK (
+      status != 'pending' OR (
+        stripe_payment_intent_id IS NULL AND
+        balance_after IS NULL AND
+        completed_at IS NULL AND
+        receipt_sent_at IS NULL
+      )
+    );
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'processing_shape') THEN
+    ALTER TABLE payment_reservations ADD CONSTRAINT processing_shape CHECK (
+      status != 'processing' OR (
+        stripe_payment_intent_id IS NOT NULL AND
+        balance_after IS NULL AND
+        completed_at IS NULL AND
+        receipt_sent_at IS NULL
+      )
+    );
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'succeeded_shape') THEN
+    ALTER TABLE payment_reservations ADD CONSTRAINT succeeded_shape CHECK (
+      status != 'succeeded' OR (
+        stripe_payment_intent_id IS NOT NULL AND
+        balance_after IS NOT NULL AND
+        completed_at IS NOT NULL
+      )
+    );
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'expired_shape') THEN
+    ALTER TABLE payment_reservations ADD CONSTRAINT expired_shape CHECK (
+      status != 'expired' OR (
+        stripe_payment_intent_id IS NULL AND
+        balance_after IS NULL AND
+        completed_at IS NULL AND
+        receipt_sent_at IS NULL
+      )
+    );
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'cancelled_shape') THEN
+    ALTER TABLE payment_reservations ADD CONSTRAINT cancelled_shape CHECK (
+      status != 'cancelled' OR (
+        stripe_payment_intent_id IS NOT NULL AND
+        balance_after IS NULL AND
+        completed_at IS NULL AND
+        receipt_sent_at IS NULL
+      )
+    );
+  END IF;
+END $$;
+
+-- ============================================================
+-- Step 6: Indexes
+-- ============================================================
+
+-- Partial unique index: only ONE active/successful first-purchase claim per company
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_first_purchase_claim
+  ON payment_reservations(company_id)
+  WHERE is_first_purchase = TRUE
+    AND status IN ('pending', 'processing', 'succeeded');
+
+-- General indexes
+CREATE INDEX IF NOT EXISTS idx_payment_reservations_company ON payment_reservations(company_id);
+CREATE INDEX IF NOT EXISTS idx_payment_reservations_stripe_pi ON payment_reservations(stripe_payment_intent_id);
+CREATE INDEX IF NOT EXISTS idx_payment_reservations_status ON payment_reservations(status);
+
+-- Receipt outbox indexes
+CREATE INDEX IF NOT EXISTS idx_receipt_outbox_pending ON receipt_outbox(status, created_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_receipt_outbox_reservation ON receipt_outbox(reservation_id);
+
+-- Credit ledger indexes
+CREATE INDEX IF NOT EXISTS idx_credit_ledger_company ON credit_ledger(company_id);
+
+-- Purchases new column indexes
+CREATE INDEX IF NOT EXISTS idx_purchases_stripe_pi ON purchases(stripe_payment_intent_id) WHERE stripe_payment_intent_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_purchases_reservation ON purchases(reservation_id) WHERE reservation_id IS NOT NULL;
+
+-- ============================================================
+-- Step 7: Transition trigger function + trigger
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION prevent_invalid_transitions()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Allow same-state updates (no-op transitions)
+  IF OLD.status = NEW.status THEN
+    RETURN NEW;
+  END IF;
+
+  -- Prevent any transition FROM succeeded
+  IF OLD.status = 'succeeded' AND NEW.status != 'succeeded' THEN
+    RAISE EXCEPTION 'Invalid transition: succeeded -> %', NEW.status;
+  END IF;
+
+  -- Prevent any transition FROM cancelled
+  IF OLD.status = 'cancelled' AND NEW.status != 'cancelled' THEN
+    RAISE EXCEPTION 'Invalid transition: cancelled -> %', NEW.status;
+  END IF;
+
+  -- Prevent any transition FROM expired
+  IF OLD.status = 'expired' AND NEW.status != 'expired' THEN
+    RAISE EXCEPTION 'Invalid transition: expired -> %', NEW.status;
+  END IF;
+
+  -- Allow only specific transitions
+  IF OLD.status = 'pending' AND NEW.status NOT IN ('processing', 'expired') THEN
+    RAISE EXCEPTION 'Invalid transition: pending -> %', NEW.status;
+  END IF;
+
+  IF OLD.status = 'processing' AND NEW.status NOT IN ('succeeded', 'cancelled') THEN
+    RAISE EXCEPTION 'Invalid transition: processing -> %', NEW.status;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS enforce_valid_transitions ON payment_reservations;
+CREATE TRIGGER enforce_valid_transitions
+  BEFORE UPDATE ON payment_reservations
+  FOR EACH ROW
+  EXECUTE FUNCTION prevent_invalid_transitions();
+
+-- ============================================================
+-- Step 8: Payment RPC functions (BIGINT company_id)
+-- ============================================================
+
+-- 8a. create_payment_reservation
+CREATE OR REPLACE FUNCTION create_payment_reservation(
+  p_company_id BIGINT,
+  p_package_id TEXT
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_package public.credit_packages%ROWTYPE;
+  v_is_first_purchase BOOLEAN;
+  v_final_price_pence INTEGER;
+  v_reservation_id UUID;
+BEGIN
+  -- Validate package exists and is active
+  SELECT * INTO v_package
+  FROM public.credit_packages
+  WHERE id = p_package_id AND active = TRUE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Invalid or inactive package: %', p_package_id;
+  END IF;
+
+  -- Check if company exists and get purchase history
+  SELECT has_purchased INTO v_is_first_purchase
+  FROM public.companies
+  WHERE id = p_company_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Company not found: %', p_company_id;
+  END IF;
+
+  -- Determine first purchase status (trusted server-side logic)
+  v_is_first_purchase := NOT v_is_first_purchase;
+
+  -- Defense in depth: even if has_purchased flag is wrong,
+  -- check actual purchase history to prevent incorrect discount
+  IF v_is_first_purchase THEN
+    IF EXISTS (
+      SELECT 1 FROM public.purchases
+      WHERE company_id = p_company_id
+        AND status = 'completed'
+    ) THEN
+      -- Company has historical completed purchases — not eligible for discount
+      v_is_first_purchase := FALSE;
+      -- Also correct the flag for future calls
+      UPDATE public.companies SET has_purchased = TRUE WHERE id = p_company_id;
+    END IF;
+  END IF;
+
+  -- Calculate final price with discount if applicable
+  IF v_is_first_purchase THEN
+    v_final_price_pence := v_package.price_pence * (100 - v_package.first_purchase_discount_percent) / 100;
+  ELSE
+    v_final_price_pence := v_package.price_pence;
+  END IF;
+
+  -- Create reservation with immutable pricing snapshot
+  INSERT INTO public.payment_reservations (
+    company_id,
+    package_id,
+    credits,
+    amount_pence,
+    currency,
+    is_first_purchase,
+    status
+  ) VALUES (
+    p_company_id,
+    p_package_id,
+    v_package.credits,
+    v_final_price_pence,
+    'gbp',
+    v_is_first_purchase,
+    'pending'
+  )
+  RETURNING id INTO v_reservation_id;
+
+  RETURN v_reservation_id;
+EXCEPTION
+  WHEN unique_violation THEN
+    -- Concurrent first-purchase claim detected — retry without discount
+    IF v_is_first_purchase THEN
+      v_is_first_purchase := FALSE;
+      v_final_price_pence := v_package.price_pence;
+
+      INSERT INTO public.payment_reservations (
+        company_id,
+        package_id,
+        credits,
+        amount_pence,
+        currency,
+        is_first_purchase,
+        status
+      ) VALUES (
+        p_company_id,
+        p_package_id,
+        v_package.credits,
+        v_final_price_pence,
+        'gbp',
+        FALSE,
+        'pending'
+      )
+      RETURNING id INTO v_reservation_id;
+
+      RETURN v_reservation_id;
+    ELSE
+      RAISE;
+    END IF;
+END;
+$$;
+
+-- 8b. attach_stripe_payment_intent
+CREATE OR REPLACE FUNCTION attach_stripe_payment_intent(
+  p_reservation_id UUID,
+  p_stripe_payment_intent_id TEXT,
+  p_stripe_amount_pence INTEGER,
+  p_stripe_currency TEXT
+)
+RETURNS TABLE (
+  transitioned_now BOOLEAN,
+  already_in_target_state BOOLEAN
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_reservation public.payment_reservations%ROWTYPE;
+BEGIN
+  SELECT * INTO v_reservation
+  FROM public.payment_reservations
+  WHERE id = p_reservation_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Reservation not found: %', p_reservation_id;
+  END IF;
+
+  IF v_reservation.status != 'pending' THEN
+    IF v_reservation.status = 'processing' AND v_reservation.stripe_payment_intent_id = p_stripe_payment_intent_id THEN
+      -- Idempotent retry: verify amount/currency even on retry
+      IF p_stripe_amount_pence != v_reservation.amount_pence THEN
+        RAISE EXCEPTION 'Amount mismatch: expected %, got %', v_reservation.amount_pence, p_stripe_amount_pence;
+      END IF;
+      IF p_stripe_currency != v_reservation.currency THEN
+        RAISE EXCEPTION 'Currency mismatch: expected %, got %', v_reservation.currency, p_stripe_currency;
+      END IF;
+      RETURN QUERY SELECT FALSE, TRUE;
+      RETURN;
+    ELSE
+      RAISE EXCEPTION 'Invalid state transition: % -> processing', v_reservation.status;
+    END IF;
+  END IF;
+
+  IF p_stripe_amount_pence != v_reservation.amount_pence THEN
+    RAISE EXCEPTION 'Amount mismatch: expected %, got %', v_reservation.amount_pence, p_stripe_amount_pence;
+  END IF;
+
+  IF p_stripe_currency != v_reservation.currency THEN
+    RAISE EXCEPTION 'Currency mismatch: expected %, got %', v_reservation.currency, p_stripe_currency;
+  END IF;
+
+  UPDATE public.payment_reservations
+  SET
+    status = 'processing',
+    stripe_payment_intent_id = p_stripe_payment_intent_id,
+    updated_at = NOW()
+  WHERE id = p_reservation_id;
+
+  RETURN QUERY SELECT TRUE, FALSE;
+END;
+$$;
+
+-- 8c. process_stripe_payment_atomic
+CREATE OR REPLACE FUNCTION process_stripe_payment_atomic(
+  p_stripe_payment_intent_id TEXT,
+  p_stripe_amount_pence INTEGER,
+  p_stripe_currency TEXT
+)
+RETURNS TABLE (
+  status TEXT,
+  balance_after INTEGER,
+  credits_added INTEGER,
+  already_processed BOOLEAN
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_reservation public.payment_reservations%ROWTYPE;
+  v_new_balance INTEGER;
+BEGIN
+  SELECT * INTO v_reservation
+  FROM public.payment_reservations
+  WHERE stripe_payment_intent_id = p_stripe_payment_intent_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Reservation not found for PaymentIntent: %', p_stripe_payment_intent_id;
+  END IF;
+
+  -- Idempotency: already processed
+  IF v_reservation.status = 'succeeded' THEN
+    IF p_stripe_amount_pence != v_reservation.amount_pence THEN
+      RAISE EXCEPTION 'Amount mismatch: expected %, got %', v_reservation.amount_pence, p_stripe_amount_pence;
+    END IF;
+    IF p_stripe_currency != v_reservation.currency THEN
+      RAISE EXCEPTION 'Currency mismatch: expected %, got %', v_reservation.currency, p_stripe_currency;
+    END IF;
+    RETURN QUERY SELECT
+      v_reservation.status,
+      v_reservation.balance_after,
+      v_reservation.credits,
+      TRUE;
+    RETURN;
+  END IF;
+
+  IF v_reservation.status != 'processing' THEN
+    RAISE EXCEPTION 'Invalid state for payment processing: %', v_reservation.status;
+  END IF;
+
+  IF p_stripe_amount_pence != v_reservation.amount_pence THEN
+    RAISE EXCEPTION 'Amount mismatch: expected %, got %', v_reservation.amount_pence, p_stripe_amount_pence;
+  END IF;
+
+  IF p_stripe_currency != v_reservation.currency THEN
+    RAISE EXCEPTION 'Currency mismatch: expected %, got %', v_reservation.currency, p_stripe_currency;
+  END IF;
+
+  -- ATOMIC TRANSACTION START
+
+  -- 1. Create purchase record (using BOTH legacy and new columns)
+  INSERT INTO public.purchases (
+    company_id,
+    package_name,
+    package_id,
+    credits,
+    amount,
+    amount_pence,
+    currency,
+    stripe_payment_id,
+    stripe_payment_intent_id,
+    is_first_purchase,
+    reservation_id,
+    status
+  ) VALUES (
+    v_reservation.company_id,
+    v_reservation.package_id,
+    v_reservation.package_id,
+    v_reservation.credits,
+    v_reservation.amount_pence / 100.0,
+    v_reservation.amount_pence,
+    v_reservation.currency,
+    p_stripe_payment_intent_id,
+    p_stripe_payment_intent_id,
+    v_reservation.is_first_purchase,
+    v_reservation.id,
+    'completed'
+  );
+
+  -- 2. Add credits to company (atomic increment)
+  UPDATE public.companies
+  SET
+    credits = credits + v_reservation.credits,
+    has_purchased = TRUE
+  WHERE id = v_reservation.company_id
+  RETURNING credits INTO v_new_balance;
+
+  -- 3. Insert credit-ledger entry
+  INSERT INTO public.credit_ledger (
+    company_id,
+    change_amount,
+    balance_after,
+    reason,
+    reference_id
+  ) VALUES (
+    v_reservation.company_id,
+    v_reservation.credits,
+    v_new_balance,
+    'purchase',
+    v_reservation.id::TEXT
+  );
+
+  -- 4. Mark reservation succeeded
+  UPDATE public.payment_reservations
+  SET
+    status = 'succeeded',
+    balance_after = v_new_balance,
+    completed_at = NOW(),
+    updated_at = NOW()
+  WHERE id = v_reservation.id;
+
+  -- 5. Create receipt outbox job atomically
+  INSERT INTO public.receipt_outbox (
+    reservation_id,
+    company_id,
+    credits_added,
+    amount_pence,
+    balance_after,
+    status
+  ) VALUES (
+    v_reservation.id,
+    v_reservation.company_id,
+    v_reservation.credits,
+    v_reservation.amount_pence,
+    v_new_balance,
+    'pending'
+  );
+
+  -- ATOMIC TRANSACTION END
+
+  RETURN QUERY SELECT
+    'succeeded'::TEXT,
+    v_new_balance,
+    v_reservation.credits,
+    FALSE;
+END;
+$$;
+
+-- 8d. expire_pending_reservation
+CREATE OR REPLACE FUNCTION expire_pending_reservation(
+  p_reservation_id UUID
+)
+RETURNS TABLE (
+  transitioned_now BOOLEAN,
+  already_in_target_state BOOLEAN
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_reservation public.payment_reservations%ROWTYPE;
+BEGIN
+  SELECT * INTO v_reservation
+  FROM public.payment_reservations
+  WHERE id = p_reservation_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Reservation not found: %', p_reservation_id;
+  END IF;
+
+  IF v_reservation.status = 'expired' THEN
+    RETURN QUERY SELECT FALSE, TRUE;
+    RETURN;
+  END IF;
+
+  IF v_reservation.status != 'pending' THEN
+    RAISE EXCEPTION 'Invalid state transition: % -> expired', v_reservation.status;
+  END IF;
+
+  IF v_reservation.stripe_payment_intent_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Cannot expire reservation with attached PaymentIntent: %', p_reservation_id;
+  END IF;
+
+  UPDATE public.payment_reservations
+  SET
+    status = 'expired',
+    updated_at = NOW()
+  WHERE id = p_reservation_id;
+
+  RETURN QUERY SELECT TRUE, FALSE;
+END;
+$$;
+
+-- 8e. cancel_processing_reservation
+CREATE OR REPLACE FUNCTION cancel_processing_reservation(
+  p_stripe_payment_intent_id TEXT
+)
+RETURNS TABLE (
+  transitioned_now BOOLEAN,
+  already_in_target_state BOOLEAN
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_reservation public.payment_reservations%ROWTYPE;
+BEGIN
+  SELECT * INTO v_reservation
+  FROM public.payment_reservations
+  WHERE stripe_payment_intent_id = p_stripe_payment_intent_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Reservation not found for PaymentIntent: %', p_stripe_payment_intent_id;
+  END IF;
+
+  IF v_reservation.status = 'cancelled' THEN
+    RETURN QUERY SELECT FALSE, TRUE;
+    RETURN;
+  END IF;
+
+  IF v_reservation.status != 'processing' THEN
+    RAISE EXCEPTION 'Invalid state transition: % -> cancelled', v_reservation.status;
+  END IF;
+
+  UPDATE public.payment_reservations
+  SET
+    status = 'cancelled',
+    updated_at = NOW()
+  WHERE id = v_reservation.id;
+
+  RETURN QUERY SELECT TRUE, FALSE;
+END;
+$$;
+
+-- ============================================================
+-- Step 9: Receipt RPC functions
+-- ============================================================
+
+-- 9a. claim_receipt_job
+CREATE OR REPLACE FUNCTION claim_receipt_job()
+RETURNS TABLE (
+  id UUID,
+  reservation_id UUID,
+  company_id BIGINT,
+  credits_added INTEGER,
+  amount_pence INTEGER,
+  balance_after INTEGER
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  RETURN QUERY
+  UPDATE public.receipt_outbox
+  SET
+    status = 'processing',
+    last_attempt_at = NOW(),
+    attempts = attempts + 1
+  WHERE receipt_outbox.id = (
+    SELECT ro.id FROM public.receipt_outbox ro
+    WHERE ro.status = 'pending'
+    ORDER BY ro.created_at
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED
+  )
+  RETURNING
+    receipt_outbox.id,
+    receipt_outbox.reservation_id,
+    receipt_outbox.company_id,
+    receipt_outbox.credits_added,
+    receipt_outbox.amount_pence,
+    receipt_outbox.balance_after;
+END;
+$$;
+
+-- 9b. complete_receipt_job
+CREATE OR REPLACE FUNCTION complete_receipt_job(
+  p_job_id UUID,
+  p_provider_message_id TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  UPDATE public.receipt_outbox
+  SET
+    status = 'sent',
+    sent_at = NOW(),
+    provider_message_id = p_provider_message_id
+  WHERE id = p_job_id AND status = 'processing';
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Job not found or not in processing state: %', p_job_id;
+  END IF;
+END;
+$$;
+
+-- 9c. fail_receipt_job
+-- NOTE: attempts is incremented by claim_receipt_job() when the job is claimed.
+-- This function does NOT increment attempts again — it only evaluates the
+-- attempts value set by the most recent claim. Max 5 actual claimed attempts
+-- before permanent failure.
+CREATE OR REPLACE FUNCTION fail_receipt_job(
+  p_job_id UUID
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  UPDATE public.receipt_outbox
+  SET
+    status = CASE
+      WHEN attempts >= 5 THEN 'failed'
+      ELSE 'pending'
+    END
+  WHERE id = p_job_id
+    AND status = 'processing';
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Job not found or not in processing state: %', p_job_id;
+  END IF;
+END;
+$$;
+
+-- ============================================================
+-- Step 10: Admin adjust credits RPC (atomic)
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION admin_adjust_credits(
+  p_company_id BIGINT,
+  p_delta INTEGER,
+  p_reason TEXT
+)
+RETURNS TABLE (
+  new_balance INTEGER,
+  adjustment_applied BOOLEAN
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_current_credits INTEGER;
+  v_new_balance INTEGER;
+BEGIN
+  -- Lock the company row to prevent concurrent adjustment races
+  SELECT credits INTO v_current_credits
+  FROM public.companies
+  WHERE id = p_company_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Company not found: %', p_company_id;
+  END IF;
+
+  -- Calculate new balance
+  v_new_balance := v_current_credits + p_delta;
+
+  -- Prevent negative balance
+  IF v_new_balance < 0 THEN
+    RAISE EXCEPTION 'Insufficient credits: current %, delta %, would result in %', v_current_credits, p_delta, v_new_balance;
+  END IF;
+
+  -- Update credits atomically
+  UPDATE public.companies
+  SET
+    credits = v_new_balance,
+    updated_at = NOW()
+  WHERE id = p_company_id;
+
+  -- Insert matching ledger entry in the same transaction
+  INSERT INTO public.credit_ledger (
+    company_id,
+    change_amount,
+    balance_after,
+    reason,
+    reference_id
+  ) VALUES (
+    p_company_id,
+    p_delta,
+    v_new_balance,
+    p_reason,
+    'admin-' || EXTRACT(EPOCH FROM NOW())::BIGINT::TEXT
+  );
+
+  RETURN QUERY SELECT v_new_balance, TRUE;
+END;
+$$;
+
+-- ============================================================
+-- Step 11: Drop old obsolete functions
+-- ============================================================
+
+DROP FUNCTION IF EXISTS process_stripe_payment(TEXT, UUID, TEXT, INTEGER, NUMERIC);
+DROP FUNCTION IF EXISTS process_stripe_payment(UUID, TEXT, INTEGER, INTEGER, TEXT, BOOLEAN);
+DROP FUNCTION IF EXISTS create_payment_intent(UUID, TEXT, TEXT, INTEGER);
+DROP FUNCTION IF EXISTS create_payment_intent(UUID, TEXT, INTEGER, INTEGER, BOOLEAN, TEXT);
+
+-- ============================================================
+-- Step 12: Enable RLS on ALL tables
+-- ============================================================
+
+ALTER TABLE payment_reservations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE purchases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE credit_ledger ENABLE ROW LEVEL SECURITY;
+ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE receipt_outbox ENABLE ROW LEVEL SECURITY;
+ALTER TABLE credit_packages ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================
+-- Step 13: RLS Policies
+-- ============================================================
+-- NOTE: The application uses custom JWTs (not Supabase Auth).
+-- All database access goes through the Node.js backend using
+-- service_role credentials. Therefore:
+--   - authenticated/anon roles get NO direct table access
+--   - service_role gets full access (used by the backend)
+--   - No auth.uid() policies (they would never match)
+--   - Access control is enforced by Node requireAuth/requireAdmin
+--   - RLS is enabled as defense-in-depth (blocks direct PostgREST access)
+
+-- No RLS policies for authenticated/anon — they get no access at all.
+-- The backend uses service_role which bypasses RLS.
+-- This is correct for a server-authoritative architecture.
+
+-- ============================================================
+-- Step 14: GRANT/REVOKE — Service Role (backend full access)
+-- ============================================================
+
+-- Table access
+GRANT SELECT, INSERT, UPDATE ON payment_reservations TO service_role;
+GRANT SELECT ON credit_packages TO service_role;
+GRANT SELECT, UPDATE ON companies TO service_role;
+GRANT SELECT, INSERT, UPDATE ON receipt_outbox TO service_role;
+GRANT SELECT, INSERT ON purchases TO service_role;
+GRANT SELECT, INSERT ON credit_ledger TO service_role;
+
+-- RPC execution
+GRANT EXECUTE ON FUNCTION create_payment_reservation(BIGINT, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION attach_stripe_payment_intent(UUID, TEXT, INTEGER, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION process_stripe_payment_atomic(TEXT, INTEGER, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION expire_pending_reservation(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION cancel_processing_reservation(TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION claim_receipt_job() TO service_role;
+GRANT EXECUTE ON FUNCTION complete_receipt_job(UUID, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION fail_receipt_job(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION admin_adjust_credits(BIGINT, INTEGER, TEXT) TO service_role;
+
+-- ============================================================
+-- Step 15: GRANT/REVOKE — Anon Role (no access)
+-- ============================================================
+
+REVOKE ALL ON payment_reservations FROM anon;
+REVOKE ALL ON credit_packages FROM anon;
+REVOKE ALL ON companies FROM anon;
+REVOKE ALL ON receipt_outbox FROM anon;
+REVOKE ALL ON purchases FROM anon;
+REVOKE ALL ON credit_ledger FROM anon;
+
+REVOKE EXECUTE ON FUNCTION create_payment_reservation(BIGINT, TEXT) FROM anon;
+REVOKE EXECUTE ON FUNCTION attach_stripe_payment_intent(UUID, TEXT, INTEGER, TEXT) FROM anon;
+REVOKE EXECUTE ON FUNCTION process_stripe_payment_atomic(TEXT, INTEGER, TEXT) FROM anon;
+REVOKE EXECUTE ON FUNCTION expire_pending_reservation(UUID) FROM anon;
+REVOKE EXECUTE ON FUNCTION cancel_processing_reservation(TEXT) FROM anon;
+REVOKE EXECUTE ON FUNCTION claim_receipt_job() FROM anon;
+REVOKE EXECUTE ON FUNCTION complete_receipt_job(UUID, TEXT) FROM anon;
+REVOKE EXECUTE ON FUNCTION fail_receipt_job(UUID) FROM anon;
+REVOKE EXECUTE ON FUNCTION admin_adjust_credits(BIGINT, INTEGER, TEXT) FROM anon;
+
+-- ============================================================
+-- Step 16: GRANT/REVOKE — Authenticated Role (no direct access)
+-- ============================================================
+-- Custom JWT users do NOT have Supabase Auth sessions.
+-- They cannot access PostgREST directly. All access goes through
+-- the Node.js backend which uses service_role credentials.
+-- Therefore: revoke everything from authenticated role.
+
+REVOKE ALL ON payment_reservations FROM authenticated;
+REVOKE ALL ON credit_packages FROM authenticated;
+REVOKE ALL ON companies FROM authenticated;
+REVOKE ALL ON receipt_outbox FROM authenticated;
+REVOKE ALL ON purchases FROM authenticated;
+REVOKE ALL ON credit_ledger FROM authenticated;
+
+REVOKE EXECUTE ON FUNCTION create_payment_reservation(BIGINT, TEXT) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION attach_stripe_payment_intent(UUID, TEXT, INTEGER, TEXT) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION process_stripe_payment_atomic(TEXT, INTEGER, TEXT) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION expire_pending_reservation(UUID) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION cancel_processing_reservation(TEXT) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION claim_receipt_job() FROM authenticated;
+REVOKE EXECUTE ON FUNCTION complete_receipt_job(UUID, TEXT) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION fail_receipt_job(UUID) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION admin_adjust_credits(BIGINT, INTEGER, TEXT) FROM authenticated;
+
+-- ============================================================
+-- Step 17: GRANT/REVOKE — PUBLIC Role
+-- ============================================================
+
+REVOKE EXECUTE ON FUNCTION create_payment_reservation(BIGINT, TEXT) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION attach_stripe_payment_intent(UUID, TEXT, INTEGER, TEXT) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION process_stripe_payment_atomic(TEXT, INTEGER, TEXT) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION expire_pending_reservation(UUID) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION cancel_processing_reservation(TEXT) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION claim_receipt_job() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION complete_receipt_job(UUID, TEXT) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION fail_receipt_job(UUID) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION admin_adjust_credits(BIGINT, INTEGER, TEXT) FROM PUBLIC;

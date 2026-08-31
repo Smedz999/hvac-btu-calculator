@@ -1,0 +1,531 @@
+================================================================================
+FILE: api/server.js — PAYMENT-RELATED SECTIONS ONLY
+PURPOSE: Server-side payment flow using migration 003 reservation architecture
+UPDATED: 2026-08-31 — Final alignment (no CREDIT_PACKAGES, no confirm-payment, JWT-only companyId)
+SECTIONS: Supabase/Stripe setup, auth, create-payment-intent, webhook, admin credits,
+          receipt worker, package logic, company PUT credit protection
+================================================================================
+
+--- SECTION: Imports, Supabase & Stripe initialization (lines 1-100) ---
+const express = require('express');
+const rateLimit = require('express-rate-limit');
+const { generateToken, generateAdminToken, requireAuth, requireAdmin } = require('./auth');
+const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
+
+// Web Push (VAPID)
+let webpush = null;
+try {
+  webpush = require('web-push');
+  const vapidPublic = process.env.VAPID_PUBLIC_KEY;
+  const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
+  if (vapidPublic && vapidPrivate) {
+    webpush.setVapidDetails('mailto:admin@acconnx.com', vapidPublic, vapidPrivate);
+    console.log('✅ Web Push initialized');
+  } else {
+    console.log('⚠️ VAPID keys not set — push notifications disabled');
+    webpush = null;
+  }
+} catch (e) {
+  console.log('⚠️ web-push not installed');
+}
+
+const app = express();
+const port = process.env.PORT || 3001;
+
+// Supabase connection with better error handling
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY environment variables');
+}
+
+// Create Supabase client with options to handle JWT issues
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'acconnx-api'
+    }
+  }
+});
+
+// Add error handling wrapper for Supabase queries
+async function safeQuery(queryFn) {
+  try {
+    return await queryFn();
+  } catch (err) {
+    // Check for JWT errors
+    if (err.message && err.message.includes('JWT')) {
+      console.error('JWT Error - check SUPABASE_SERVICE_KEY:', err.message);
+      throw new Error('Database authentication error. Please check server configuration.');
+    }
+    throw err;
+  }
+}
+
+console.log('✅ Supabase initialized');
+
+// Initialize services
+let stripe = null;
+let resend = null;
+let twilio = null;
+
+try {
+  if (process.env.STRIPE_SECRET_KEY) {
+    const Stripe = require('stripe');
+    stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+    console.log('✅ Stripe initialized');
+  }
+} catch (e) {
+  console.log('⚠️ Stripe not configured');
+}
+
+try {
+  if (process.env.RESEND_API_KEY) {
+    const { Resend } = require('resend');
+    resend = new Resend(process.env.RESEND_API_KEY);
+    console.log('✅ Resend initialized');
+  }
+} catch (e) {
+  console.log('⚠️ Resend not configured');
+}
+
+try {
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+    const twilioClient = require('twilio');
+    twilio = twilioClient(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    console.log('✅ Twilio initialized');
+  }
+} catch (e) {
+  console.log('⚠️ Twilio not configured');
+}
+
+
+--- SECTION: Authentication middleware (from api/auth.js) ---
+// JWT Authentication Middleware
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) { console.error('❌ JWT_SECRET environment variable is required'); process.exit(1); }
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+if (!ADMIN_PASSWORD) { console.error('❌ ADMIN_PASSWORD environment variable is required'); process.exit(1); }
+
+// Generate JWT token for a company
+function generateToken(company) {
+  return jwt.sign(
+    { id: company.id, email: company.email, company: company.company, role: 'contractor' },
+    JWT_SECRET,
+    { expiresIn: '30d' }
+  );
+}
+
+// Generate JWT token for admin
+function generateAdminToken() {
+  return jwt.sign(
+    { role: 'admin' },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+}
+
+// Middleware: require valid JWT
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+// Middleware: require admin role
+function requireAdmin(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Admin authentication required' });
+  }
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+module.exports = { generateToken, generateAdminToken, requireAuth, requireAdmin };
+
+--- SECTION: Company PUT route — credits blocked for ALL users (lines 479-520) ---
+app.put('/api/companies/:id', requireAuth, async (req, res) => {
+  try {
+    // Contractors can only update their own record; admins can update any
+    if (req.user.role !== 'admin' && req.user.id !== req.params.id) {
+      return res.status(403).json({ error: 'You can only update your own company' });
+    }
+    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    delete updates.id;
+    delete updates.password;
+    // Credits can ONLY be changed via /api/admin/adjust-credits (atomic RPC)
+    // Block ALL credit modifications through this generic route — including admin
+    delete updates.credits;
+
+    let result = await supabase
+      .from('companies')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select('id, company, name, email, phone, postcode, radius, credits, coverage_areas, created_at, updated_at')
+      .single();
+    
+    if (result.error && result.error.message && result.error.message.includes('coverage_areas')) {
+      result = await supabase
+        .from('companies')
+        .update(updates)
+        .eq('id', req.params.id)
+        .select('id, company, name, email, phone, postcode, radius, credits, created_at, updated_at')
+        .single();
+      if (result.data) result.data.coverage_areas = [];
+    }
+
+    if (result.error) throw result.error;
+    if (!result.data) return res.status(404).json({ error: 'Company not found' });
+
+    res.json({ success: true, company: result.data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =====================
+// LEADS
+// =====================
+
+--- SECTION: create-payment-intent + admin adjust-credits + receipt worker (lines 592-800) ---
+// NOTE: No hardcoded CREDIT_PACKAGES. Database credit_packages table is authoritative.
+// Package pricing mismatch: server.js previously had starter/5/£49.99, professional/15/£129.99,
+// business/30/£199.99. Migration 003 seeds starter/10/£25, growth/25/£55, pro/60/£120.
+// Business must confirm correct package values before migration is applied.
+
+// Helper: fetch package from DB (authoritative)
+async function getPackage(packageId) {
+  const { data, error } = await supabase
+    .from('credit_packages')
+    .select('*')
+    .eq('id', packageId)
+    .eq('active', true)
+    .single();
+  if (error || !data) return null;
+  return data;
+}
+
+app.post('/api/create-payment-intent', requireAuth, async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: 'Stripe not configured' });
+  }
+
+  try {
+    const { packageId } = req.body;
+    const companyId = req.user.id; // JWT only — never from client body
+
+    if (!packageId) {
+      return res.status(400).json({ error: 'packageId is required' });
+    }
+
+    // Step 1: Create reservation via RPC (validates package, calculates discount server-side)
+    const { data: reservationId, error: createErr } = await supabase.rpc('create_payment_reservation', {
+      p_company_id: companyId,
+      p_package_id: packageId
+    });
+
+    if (createErr) {
+      console.error('create_payment_reservation failed:', createErr.message);
+      return res.status(400).json({ error: createErr.message });
+    }
+
+    // Step 2: Read reservation amount/currency from DB (never trust client)
+    const { data: reservation, error: fetchErr } = await supabase
+      .from('payment_reservations')
+      .select('amount_pence, currency, credits, is_first_purchase')
+      .eq('id', reservationId)
+      .single();
+
+    if (fetchErr || !reservation) {
+      console.error('Failed to fetch reservation:', fetchErr?.message);
+      return res.status(500).json({ error: 'Failed to create payment reservation' });
+    }
+
+    // Step 3: Create Stripe PaymentIntent using reservation values
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: reservation.amount_pence,
+      currency: reservation.currency,
+      metadata: {
+        reservation_id: reservationId
+        // No companyId, credits, packageId, or discount in metadata — webhook reads from DB
+      }
+    });
+
+    // Step 4: Attach PaymentIntent to reservation
+    const { error: attachErr } = await supabase.rpc('attach_stripe_payment_intent', {
+      p_reservation_id: reservationId,
+      p_stripe_payment_intent_id: paymentIntent.id,
+      p_stripe_amount_pence: reservation.amount_pence,
+      p_stripe_currency: reservation.currency
+    });
+
+    if (attachErr) {
+      console.error('attach_stripe_payment_intent failed:', attachErr.message);
+      // Cancel the Stripe PaymentIntent since we can't attach it
+      try { await stripe.paymentIntents.cancel(paymentIntent.id); } catch (e) { /* ignore */ }
+      return res.status(500).json({ error: 'Failed to attach payment to reservation' });
+    }
+
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+      reservationId,
+      amount: reservation.amount_pence,
+      currency: reservation.currency,
+      credits: reservation.credits,
+      isFirstPurchase: reservation.is_first_purchase
+    });
+  } catch (err) {
+    console.error('create-payment-intent error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =====================
+// ADMIN — Credit Adjustments (atomic via RPC)
+// =====================
+app.post('/api/admin/adjust-credits', requireAdmin, async (req, res) => {
+  try {
+    const { companyId, delta, reason } = req.body;
+
+    if (!companyId || delta === undefined || !reason) {
+      return res.status(400).json({ error: 'companyId, delta, and reason are required' });
+    }
+
+    if (typeof delta !== 'number' || delta === 0) {
+      return res.status(400).json({ error: 'delta must be a non-zero number' });
+    }
+
+    const { data: result, error } = await supabase.rpc('admin_adjust_credits', {
+      p_company_id: companyId,
+      p_delta: delta,
+      p_reason: reason
+    }).single();
+
+    if (error) {
+      console.error('admin_adjust_credits failed:', error.message);
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.json({
+      success: true,
+      newBalance: result.new_balance,
+      adjustmentApplied: result.adjustment_applied
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =====================
+// RECEIPT WORKER (protected internal endpoint)
+// =====================
+app.post('/api/internal/process-receipts', requireAdmin, async (req, res) => {
+  try {
+    const results = { claimed: 0, sent: 0, failed: 0, errors: [] };
+
+    // Process up to 10 jobs per invocation
+    for (let i = 0; i < 10; i++) {
+      // Claim next pending job
+      const { data: job, error: claimErr } = await supabase.rpc('claim_receipt_job').maybeSingle();
+
+      if (claimErr) {
+        results.errors.push(`Claim error: ${claimErr.message}`);
+        break;
+      }
+
+      if (!job) break; // No more pending jobs
+
+      results.claimed++;
+
+      try {
+        // Fetch company email for receipt
+        const { data: company } = await supabase
+          .from('companies')
+          .select('email, name, company')
+          .eq('id', job.company_id)
+          .single();
+
+        if (!company || !company.email) {
+          throw new Error(`Company ${job.company_id} has no email`);
+        }
+
+        // Send receipt email via Resend
+        if (!resend) {
+          throw new Error('Resend not configured');
+        }
+
+        const emailResult = await resend.emails.send({
+          from: 'ACConnx <receipts@acconnx.com>',
+          to: company.email,
+          subject: 'Payment Confirmation - ACConnx',
+          html: `<h1>Thank you for your purchase!</h1>
+            <p>You bought ${job.credits_added} credits for £${(job.amount_pence / 100).toFixed(2)}.</p>
+            <p>Your new balance: ${job.balance_after} credits</p>
+            <p><a href="https://acconnx.com/company-portal.html">View Dashboard</a></p>`
+        });
+
+        const providerMessageId = emailResult?.id || emailResult?.data?.id || 'unknown';
+
+        // Mark job as sent
+        await supabase.rpc('complete_receipt_job', {
+          p_job_id: job.id,
+          p_provider_message_id: providerMessageId
+        });
+
+        // Update reservation receipt_sent_at
+        await supabase
+          .from('payment_reservations')
+          .update({ receipt_sent_at: new Date().toISOString() })
+          .eq('id', job.reservation_id);
+
+        results.sent++;
+      } catch (sendErr) {
+        console.error(`Receipt send failed for job ${job.id}:`, sendErr.message);
+
+        // Mark job as failed (will retry or permanently fail after 5 attempts)
+        try {
+          await supabase.rpc('fail_receipt_job', { p_job_id: job.id });
+        } catch (failErr) {
+          results.errors.push(`Fail RPC error for job ${job.id}: ${failErr.message}`);
+        }
+
+        results.failed++;
+      }
+    }
+
+    res.json({ success: true, ...results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+
+--- SECTION: Stripe webhook (lines 1319-1419) ---
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: 'Stripe not configured' });
+  }
+
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error('STRIPE_WEBHOOK_SECRET not set');
+    return res.status(500).json({ error: 'Webhook not configured' });
+  }
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).json({ error: 'Invalid signature' });
+  }
+
+  // Handle payment success — ONLY authority for crediting payments
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object;
+
+    try {
+      // Call atomic RPC — handles reservation lookup, idempotency, credit grant,
+      // purchase record, credit ledger, and receipt outbox in one transaction.
+      // No Stripe metadata trust — RPC reads everything from payment_reservations table.
+      const { data: result, error } = await supabase.rpc('process_stripe_payment_atomic', {
+        p_stripe_payment_intent_id: paymentIntent.id,
+        p_stripe_amount_pence: paymentIntent.amount,
+        p_stripe_currency: paymentIntent.currency
+      }).single();
+
+      if (error) {
+        console.error(`❌ Webhook: process_stripe_payment_atomic failed for ${paymentIntent.id}:`, error.message);
+        // Return 200 to prevent Stripe retries on permanent failures (e.g. reservation not found)
+        // Return 500 only for transient errors that Stripe should retry
+        if (error.message.includes('not found') || error.message.includes('Invalid state')) {
+          return res.json({ received: true, error: error.message });
+        }
+        return res.status(500).json({ error: 'Payment processing failed' });
+      }
+
+      if (result.already_processed) {
+        console.log(`✅ Webhook: Payment ${paymentIntent.id} already processed (idempotent)`);
+      } else {
+        console.log(`✅ Webhook: Payment ${paymentIntent.id} processed — ${result.credits_added} credits, balance ${result.balance_after}`);
+      }
+    } catch (err) {
+      console.error('Webhook processing error:', err);
+      return res.status(500).json({ error: 'Internal processing error' });
+    }
+  }
+
+  // Handle payment cancellation/failure — cancel the reservation
+  if (event.type === 'payment_intent.canceled' || event.type === 'payment_intent.payment_failed') {
+    const paymentIntent = event.data.object;
+
+    if (event.type === 'payment_intent.canceled') {
+      try {
+        const { error } = await supabase.rpc('cancel_processing_reservation', {
+          p_stripe_payment_intent_id: paymentIntent.id
+        }).single();
+
+        if (error) {
+          console.error(`Webhook: cancel_processing_reservation failed for ${paymentIntent.id}:`, error.message);
+        } else {
+          console.log(`✅ Webhook: Reservation cancelled for PI ${paymentIntent.id}`);
+        }
+      } catch (err) {
+        console.error('Webhook cancel error:', err);
+      }
+    }
+
+    // payment_intent.payment_failed: do NOT credit or cancel automatically.
+    // The reservation stays in 'processing' — customer can retry payment.
+    if (event.type === 'payment_intent.payment_failed') {
+      console.log(`⚠️ Webhook: Payment failed for PI ${paymentIntent.id} — reservation remains in processing`);
+    }
+  }
+
+  res.json({ received: true });
+});
+
+// =====================
+// START SERVER
+// =====================
+if (process.env.VERCEL) {
+  module.exports = app;
+} else {
+  app.listen(port, () => {
+    console.log(`🚀 ACConnx API running on port ${port}`);
+    console.log(`💳 Stripe: ${stripe ? '✅ Connected' : '⚠️ Not configured'}`);
+    console.log(`📧 Resend: ${resend ? '✅ Connected' : '⚠️ Not configured'}`);
+    console.log(`📱 Twilio: ${twilio ? '✅ Connected' : '⚠️ Not configured'}`);
+    console.log(`🔔 Push: ${webpush ? '✅ Connected' : '⚠️ Not configured'}`);
+    console.log(`🗄️ Database: ✅ Supabase`);
+  });
+}

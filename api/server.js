@@ -485,10 +485,9 @@ app.put('/api/companies/:id', requireAuth, async (req, res) => {
     const updates = { ...req.body, updated_at: new Date().toISOString() };
     delete updates.id;
     delete updates.password;
-    // Prevent contractors from setting their own credits
-    if (req.user.role !== 'admin') {
-      delete updates.credits;
-    }
+    // Credits can ONLY be changed via /api/admin/adjust-credits (atomic RPC)
+    // Block ALL credit modifications through this generic route — including admin
+    delete updates.credits;
 
     let result = await supabase
       .from('companies')
@@ -588,13 +587,24 @@ app.put('/api/leads/:id', requireAuth, async (req, res) => {
 });
 
 // =====================
-// STRIPE PAYMENTS
+// STRIPE PAYMENTS (Migration 003 — Reservation Architecture)
 // =====================
-const CREDIT_PACKAGES = {
-  starter: { name: 'Starter', credits: 5, price: 4999, firstPrice: 3999 },
-  professional: { name: 'Professional', credits: 15, price: 12999, firstPrice: 10399 },
-  business: { name: 'Business', credits: 30, price: 19999, firstPrice: 15999 }
-};
+// NOTE: No hardcoded CREDIT_PACKAGES. Database credit_packages table is authoritative.
+// Package pricing mismatch: server.js previously had starter/5/£49.99, professional/15/£129.99,
+// business/30/£199.99. Migration 003 seeds starter/10/£25, growth/25/£55, pro/60/£120.
+// Business must confirm correct package values before migration is applied.
+
+// Helper: fetch package from DB (authoritative)
+async function getPackage(packageId) {
+  const { data, error } = await supabase
+    .from('credit_packages')
+    .select('*')
+    .eq('id', packageId)
+    .eq('active', true)
+    .single();
+  if (error || !data) return null;
+  return data;
+}
 
 app.post('/api/create-payment-intent', requireAuth, async (req, res) => {
   if (!stripe) {
@@ -602,80 +612,189 @@ app.post('/api/create-payment-intent', requireAuth, async (req, res) => {
   }
 
   try {
-    const { packageId, companyId, isFirstPurchase } = req.body;
-    const pkg = CREDIT_PACKAGES[packageId];
+    const { packageId } = req.body;
+    const companyId = req.user.id; // JWT only — never from client body
 
-    if (!pkg) return res.status(400).json({ error: 'Invalid package' });
+    if (!packageId) {
+      return res.status(400).json({ error: 'packageId is required' });
+    }
 
-    const amount = isFirstPurchase ? pkg.firstPrice : pkg.price;
-
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency: 'gbp',
-      metadata: { packageId, companyId, credits: pkg.credits, isFirstPurchase: isFirstPurchase ? 'true' : 'false' }
+    // Step 1: Create reservation via RPC (validates package, calculates discount server-side)
+    const { data: reservationId, error: createErr } = await supabase.rpc('create_payment_reservation', {
+      p_company_id: companyId,
+      p_package_id: packageId
     });
 
-    res.json({ clientSecret: paymentIntent.client_secret });
+    if (createErr) {
+      console.error('create_payment_reservation failed:', createErr.message);
+      return res.status(400).json({ error: createErr.message });
+    }
+
+    // Step 2: Read reservation amount/currency from DB (never trust client)
+    const { data: reservation, error: fetchErr } = await supabase
+      .from('payment_reservations')
+      .select('amount_pence, currency, credits, is_first_purchase')
+      .eq('id', reservationId)
+      .single();
+
+    if (fetchErr || !reservation) {
+      console.error('Failed to fetch reservation:', fetchErr?.message);
+      return res.status(500).json({ error: 'Failed to create payment reservation' });
+    }
+
+    // Step 3: Create Stripe PaymentIntent using reservation values
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: reservation.amount_pence,
+      currency: reservation.currency,
+      metadata: {
+        reservation_id: reservationId
+        // No companyId, credits, packageId, or discount in metadata — webhook reads from DB
+      }
+    });
+
+    // Step 4: Attach PaymentIntent to reservation
+    const { error: attachErr } = await supabase.rpc('attach_stripe_payment_intent', {
+      p_reservation_id: reservationId,
+      p_stripe_payment_intent_id: paymentIntent.id,
+      p_stripe_amount_pence: reservation.amount_pence,
+      p_stripe_currency: reservation.currency
+    });
+
+    if (attachErr) {
+      console.error('attach_stripe_payment_intent failed:', attachErr.message);
+      // Cancel the Stripe PaymentIntent since we can't attach it
+      try { await stripe.paymentIntents.cancel(paymentIntent.id); } catch (e) { /* ignore */ }
+      return res.status(500).json({ error: 'Failed to attach payment to reservation' });
+    }
+
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+      reservationId,
+      amount: reservation.amount_pence,
+      currency: reservation.currency,
+      credits: reservation.credits,
+      isFirstPurchase: reservation.is_first_purchase
+    });
+  } catch (err) {
+    console.error('create-payment-intent error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =====================
+// ADMIN — Credit Adjustments (atomic via RPC)
+// =====================
+app.post('/api/admin/adjust-credits', requireAdmin, async (req, res) => {
+  try {
+    const { companyId, delta, reason } = req.body;
+
+    if (!companyId || delta === undefined || !reason) {
+      return res.status(400).json({ error: 'companyId, delta, and reason are required' });
+    }
+
+    if (typeof delta !== 'number' || delta === 0) {
+      return res.status(400).json({ error: 'delta must be a non-zero number' });
+    }
+
+    const { data: result, error } = await supabase.rpc('admin_adjust_credits', {
+      p_company_id: companyId,
+      p_delta: delta,
+      p_reason: reason
+    }).single();
+
+    if (error) {
+      console.error('admin_adjust_credits failed:', error.message);
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.json({
+      success: true,
+      newBalance: result.new_balance,
+      adjustmentApplied: result.adjustment_applied
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/confirm-payment', requireAuth, async (req, res) => {
+// =====================
+// RECEIPT WORKER (protected internal endpoint)
+// =====================
+app.post('/api/internal/process-receipts', requireAdmin, async (req, res) => {
   try {
-    const { companyId, packageId, credits, amount, isFirstPurchase } = req.body;
+    const results = { claimed: 0, sent: 0, failed: 0, errors: [] };
 
-    // Get current company
-    const { data: company, error: fetchError } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('id', companyId)
-      .single();
+    // Process up to 10 jobs per invocation
+    for (let i = 0; i < 10; i++) {
+      // Claim next pending job
+      const { data: job, error: claimErr } = await supabase.rpc('claim_receipt_job').maybeSingle();
 
-    if (fetchError || !company) return res.status(404).json({ error: 'Company not found' });
+      if (claimErr) {
+        results.errors.push(`Claim error: ${claimErr.message}`);
+        break;
+      }
 
-    // Update credits
-    const newCredits = (company.credits || 0) + credits;
-    const { data: updatedCompany, error: updateError } = await supabase
-      .from('companies')
-      .update({ credits: newCredits, updated_at: new Date().toISOString() })
-      .eq('id', companyId)
-      .select()
-      .single();
+      if (!job) break; // No more pending jobs
 
-    if (updateError) throw updateError;
+      results.claimed++;
 
-    // Record purchase
-    const { data: purchase, error: purchaseError } = await supabase
-      .from('purchases')
-      .insert({
-        company_id: companyId,
-        package_name: packageId,
-        credits,
-        amount: amount / 100,
-        status: 'completed'
-      })
-      .select()
-      .single();
-
-    if (purchaseError) throw purchaseError;
-
-    // Send receipt email
-    if (resend) {
       try {
-        await resend.emails.send({
+        // Fetch company email for receipt
+        const { data: company } = await supabase
+          .from('companies')
+          .select('email, name, company')
+          .eq('id', job.company_id)
+          .single();
+
+        if (!company || !company.email) {
+          throw new Error(`Company ${job.company_id} has no email`);
+        }
+
+        // Send receipt email via Resend
+        if (!resend) {
+          throw new Error('Resend not configured');
+        }
+
+        const emailResult = await resend.emails.send({
           from: 'ACConnx <receipts@acconnx.com>',
           to: company.email,
           subject: 'Payment Confirmation - ACConnx',
-          html: `<h1>Thank you for your purchase!</h1><p>You bought ${credits} credits for £${(amount / 100).toFixed(2)}.</p><p>Your new balance: ${newCredits} credits</p><p><a href="https://acconnx.com/company-portal.html">View Dashboard</a></p>`
+          html: `<h1>Thank you for your purchase!</h1>
+            <p>You bought ${job.credits_added} credits for £${(job.amount_pence / 100).toFixed(2)}.</p>
+            <p>Your new balance: ${job.balance_after} credits</p>
+            <p><a href="https://acconnx.com/company-portal.html">View Dashboard</a></p>`
         });
-      } catch (e) {
-        console.log('Failed to send receipt:', e.message);
+
+        const providerMessageId = emailResult?.id || emailResult?.data?.id || 'unknown';
+
+        // Mark job as sent
+        await supabase.rpc('complete_receipt_job', {
+          p_job_id: job.id,
+          p_provider_message_id: providerMessageId
+        });
+
+        // Update reservation receipt_sent_at
+        await supabase
+          .from('payment_reservations')
+          .update({ receipt_sent_at: new Date().toISOString() })
+          .eq('id', job.reservation_id);
+
+        results.sent++;
+      } catch (sendErr) {
+        console.error(`Receipt send failed for job ${job.id}:`, sendErr.message);
+
+        // Mark job as failed (will retry or permanently fail after 5 attempts)
+        try {
+          await supabase.rpc('fail_receipt_job', { p_job_id: job.id });
+        } catch (failErr) {
+          results.errors.push(`Fail RPC error for job ${job.id}: ${failErr.message}`);
+        }
+
+        results.failed++;
       }
     }
 
-    delete updatedCompany.password;
-    res.json({ success: true, company: updatedCompany, purchase });
+    res.json({ success: true, ...results });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1195,7 +1314,7 @@ async function sendPushToCompany(companyId, { title, body, url, tag }) {
 }
 
 // =====================
-// STRIPE WEBHOOK (secure payment verification)
+// STRIPE WEBHOOK (Migration 003 — Atomic RPC payment completion)
 // =====================
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   if (!stripe) {
@@ -1218,86 +1337,65 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
     return res.status(400).json({ error: 'Invalid signature' });
   }
 
+  // Handle payment success — ONLY authority for crediting payments
   if (event.type === 'payment_intent.succeeded') {
     const paymentIntent = event.data.object;
-    const { companyId, credits, packageId, isFirstPurchase } = paymentIntent.metadata;
-
-    if (!companyId || !credits) {
-      console.error('Missing metadata in payment intent:', paymentIntent.id);
-      return res.json({ received: true });
-    }
-
-    // Verify payment amount matches expected package price
-    const pkg = CREDIT_PACKAGES[packageId];
-    if (pkg) {
-      const expectedAmount = isFirstPurchase === 'true' ? pkg.firstPrice : pkg.price;
-      if (paymentIntent.amount !== expectedAmount) {
-        console.error(`⚠️ Amount mismatch for payment ${paymentIntent.id}: expected ${expectedAmount}, got ${paymentIntent.amount}. Skipping credit grant.`);
-        return res.json({ received: true });
-      }
-      // Also verify credits match the package
-      if (parseInt(credits) !== pkg.credits) {
-        console.error(`⚠️ Credits mismatch for payment ${paymentIntent.id}: expected ${pkg.credits}, got ${credits}. Skipping credit grant.`);
-        return res.json({ received: true });
-      }
-    } else {
-      console.error(`⚠️ Unknown packageId "${packageId}" in payment ${paymentIntent.id}. Skipping credit grant.`);
-      return res.json({ received: true });
-    }
 
     try {
-      // Get current company
-      const { data: company, error: fetchError } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', companyId)
-        .single();
+      // Call atomic RPC — handles reservation lookup, idempotency, credit grant,
+      // purchase record, credit ledger, and receipt outbox in one transaction.
+      // No Stripe metadata trust — RPC reads everything from payment_reservations table.
+      const { data: result, error } = await supabase.rpc('process_stripe_payment_atomic', {
+        p_stripe_payment_intent_id: paymentIntent.id,
+        p_stripe_amount_pence: paymentIntent.amount,
+        p_stripe_currency: paymentIntent.currency
+      }).single();
 
-      if (fetchError || !company) {
-        console.error('Company not found for webhook:', companyId);
-        return res.json({ received: true });
-      }
-
-      // Update credits
-      const newCredits = (company.credits || 0) + parseInt(credits);
-      await supabase
-        .from('companies')
-        .update({
-          credits: newCredits,
-          has_purchased: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', companyId);
-
-      // Record purchase
-      await supabase
-        .from('purchases')
-        .insert({
-          company_id: companyId,
-          package_name: packageId || 'unknown',
-          credits: parseInt(credits),
-          amount: paymentIntent.amount / 100,
-          status: 'completed',
-          stripe_payment_id: paymentIntent.id
-        });
-
-      // Send receipt email
-      if (resend) {
-        try {
-          await resend.emails.send({
-            from: 'ACConnx <receipts@acconnx.com>',
-            to: company.email,
-            subject: 'Payment Confirmation - ACConnx',
-            html: `<h1>Thank you for your purchase!</h1><p>You bought ${credits} credits for £${(paymentIntent.amount / 100).toFixed(2)}.</p><p>Your new balance: ${newCredits} credits</p><p><a href="https://acconnx.com/company-portal.html">View Dashboard</a></p>`
-          });
-        } catch (e) {
-          console.log('Failed to send receipt:', e.message);
+      if (error) {
+        console.error(`❌ Webhook: process_stripe_payment_atomic failed for ${paymentIntent.id}:`, error.message);
+        // Return 200 to prevent Stripe retries on permanent failures (e.g. reservation not found)
+        // Return 500 only for transient errors that Stripe should retry
+        if (error.message.includes('not found') || error.message.includes('Invalid state')) {
+          return res.json({ received: true, error: error.message });
         }
+        return res.status(500).json({ error: 'Payment processing failed' });
       }
 
-      console.log(`✅ Webhook: Added ${credits} credits to company ${companyId}`);
+      if (result.already_processed) {
+        console.log(`✅ Webhook: Payment ${paymentIntent.id} already processed (idempotent)`);
+      } else {
+        console.log(`✅ Webhook: Payment ${paymentIntent.id} processed — ${result.credits_added} credits, balance ${result.balance_after}`);
+      }
     } catch (err) {
       console.error('Webhook processing error:', err);
+      return res.status(500).json({ error: 'Internal processing error' });
+    }
+  }
+
+  // Handle payment cancellation/failure — cancel the reservation
+  if (event.type === 'payment_intent.canceled' || event.type === 'payment_intent.payment_failed') {
+    const paymentIntent = event.data.object;
+
+    if (event.type === 'payment_intent.canceled') {
+      try {
+        const { error } = await supabase.rpc('cancel_processing_reservation', {
+          p_stripe_payment_intent_id: paymentIntent.id
+        }).single();
+
+        if (error) {
+          console.error(`Webhook: cancel_processing_reservation failed for ${paymentIntent.id}:`, error.message);
+        } else {
+          console.log(`✅ Webhook: Reservation cancelled for PI ${paymentIntent.id}`);
+        }
+      } catch (err) {
+        console.error('Webhook cancel error:', err);
+      }
+    }
+
+    // payment_intent.payment_failed: do NOT credit or cancel automatically.
+    // The reservation stays in 'processing' — customer can retry payment.
+    if (event.type === 'payment_intent.payment_failed') {
+      console.log(`⚠️ Webhook: Payment failed for PI ${paymentIntent.id} — reservation remains in processing`);
     }
   }
 

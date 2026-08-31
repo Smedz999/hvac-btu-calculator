@@ -1442,18 +1442,12 @@ async function processPayment() {
 
   try {
     const packageId = Object.keys(CREDIT_PACKAGES).find(key => CREDIT_PACKAGES[key].name === selectedPackage.name);
-    const isFirstPurchase = !currentUser.hasPurchased;
-    const amountToCharge = isFirstPurchase ? selectedPackage.firstPrice : selectedPackage.price;
-    
+
+    // Only send packageId — server determines company, price, credits, and discount from JWT + DB
     const res = await fetch(`${API_URL}/create-payment-intent`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        packageId: packageId,
-        companyId: currentUser.id,
-        amount: amountToCharge,
-        isFirstPurchase: isFirstPurchase
-      })
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ packageId })
     });
 
     const data = await res.json();
@@ -1471,34 +1465,35 @@ async function processPayment() {
       document.getElementById('card-errors').textContent = result.error.message;
       showToast(result.error.message, 'error');
     } else {
-      // Payment successful — server webhook adds credits, just confirm and refresh
+      // Payment succeeded on Stripe — webhook is the ONLY authority for crediting
       paymentSucceeded = true;
-      
-      // Confirm payment with server and wait for response
-      try {
-        const confirmRes = await fetch(`${API_URL}/confirm-payment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({
-            companyId: currentUser.id,
-            packageId: packageId,
-            credits: selectedPackage.credits,
-            amount: selectedPackage.price
-          })
-        });
-        
-        if (confirmRes.ok) {
-          const confirmData = await confirmRes.json();
-          // Update user from server response (server is source of truth for credits)
-          if (confirmData.company) {
-            currentUser = { ...currentUser, ...confirmData.company };
+      closePaymentModal();
+      showToast('Payment successful! Updating your credits...', 'success');
+
+      // Poll server for updated credit balance (webhook processes asynchronously)
+      const maxWait = 15000; // 15 seconds
+      const interval = 2000; // poll every 2 seconds
+      const startTime = Date.now();
+      let creditsUpdated = false;
+
+      while (Date.now() - startTime < maxWait) {
+        try {
+          const userRes = await fetch(`${API_URL}/companies/${currentUser.id}`, { headers: authHeaders() });
+          if (userRes.ok) {
+            const freshUser = await userRes.json();
+            if (freshUser && freshUser.credits !== currentUser.credits) {
+              currentUser = { ...currentUser, ...freshUser };
+              creditsUpdated = true;
+              break;
+            }
           }
+        } catch (e) {
+          console.log('Poll error:', e.message);
         }
-      } catch (syncErr) {
-        console.log('Server sync failed, webhook will handle credit addition:', syncErr.message);
+        await new Promise(r => setTimeout(r, interval));
       }
-      
-      // Refresh user data from server to get accurate credit count
+
+      // Final refresh regardless
       try {
         const userRes = await fetch(`${API_URL}/companies/${currentUser.id}`, { headers: authHeaders() });
         if (userRes.ok) {
@@ -1507,35 +1502,21 @@ async function processPayment() {
             currentUser = { ...currentUser, ...freshUser };
           }
         }
-      } catch (refreshErr) {
-        console.log('Failed to refresh user data:', refreshErr.message);
-      }
-      
+      } catch (e) { /* ignore */ }
+
       currentUser.hasPurchased = true;
       updateCurrentUser();
-      
-      // Save purchase to localStorage for tracking (use consistent field names)
-      const purchases = JSON.parse(localStorage.getItem('hvac_purchases') || '[]');
-      const amountPaid = isFirstPurchase ? selectedPackage.firstPriceDisplay : selectedPackage.priceDisplay;
-      purchases.push({
-        id: 'pur_' + Date.now(),
-        companyId: currentUser.id,
-        package_name: selectedPackage.name,
-        credits: selectedPackage.credits,
-        amount: amountPaid,
-        isFirstPurchase: isFirstPurchase,
-        created_at: new Date().toISOString()
-      });
-      localStorage.setItem('hvac_purchases', JSON.stringify(purchases));
-      
-      closePaymentModal();
-      showToast(`Payment successful! ${selectedPackage.credits} credits added.`);
+
+      if (creditsUpdated) {
+        showToast(`${selectedPackage.credits} credits added to your account!`, 'success');
+      } else {
+        showToast('Payment processed. Credits will appear shortly — please refresh in a moment.', 'info');
+      }
+
       loadPurchaseHistory();
     }
   } catch (err) {
     console.error('Payment error:', err);
-    console.error('Error stack:', err.stack);
-    console.error('Payment succeeded flag:', paymentSucceeded);
     if (!paymentSucceeded) {
       showToast('Payment failed. Please try again.', 'error');
     }
