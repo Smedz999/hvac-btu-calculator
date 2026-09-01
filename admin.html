@@ -971,18 +971,14 @@ async function addCredits(companyId, companyName) {
   if (!amount || isNaN(amount) || parseInt(amount) <= 0) return;
 
   const credits = parseInt(amount);
-  const company = cachedCompanies.find(c => String(c.id) === String(companyId));
-  if (!company) return;
 
-  const newCredits = (company.credits || 0) + credits;
-
-  const result = await fetchAPI(`/companies/${companyId}`, {
-    method: 'PUT',
-    body: JSON.stringify({ credits: newCredits })
+  const result = await fetchAPI(`/admin/adjust-credits`, {
+    method: 'POST',
+    body: JSON.stringify({ companyId, delta: credits, reason: 'Manual admin credit addition' })
   });
 
   if (result && result.success) {
-    showToast(`Added ${credits} credits to ${companyName}. New balance: ${newCredits}`, 'success');
+    showToast(`Added ${credits} credits to ${companyName}. New balance: ${result.newBalance}`, 'success');
     await loadAllData();
     renderCompanies();
   } else {

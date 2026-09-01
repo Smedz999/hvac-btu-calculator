@@ -99,6 +99,106 @@ try {
 }
 
 app.use(cors({ origin: ['https://acconnx.com', 'https://www.acconnx.com', 'http://localhost:3000', 'http://localhost:5000'] }));
+
+// =====================
+// STRIPE WEBHOOK (Migration 003 — Atomic RPC payment completion)
+// =====================
+// IMPORTANT: This route is registered BEFORE app.use(express.json()) below,
+// and uses its own express.raw() body parser. Stripe signature verification
+// requires the exact raw request bytes — if the global JSON body parser ran
+// first, req.body would already be a parsed object by the time this handler
+// runs, and constructEvent() would fail signature verification for every
+// real webhook delivery.
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: 'Stripe not configured' });
+  }
+
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error('STRIPE_WEBHOOK_SECRET not set');
+    return res.status(500).json({ error: 'Webhook not configured' });
+  }
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).json({ error: 'Invalid signature' });
+  }
+
+  // Handle payment success — ONLY authority for crediting payments
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object;
+
+    try {
+      // Call atomic RPC — handles reservation lookup, idempotency, credit grant,
+      // purchase record, credit ledger, and receipt outbox in one transaction.
+      // No Stripe metadata trust — RPC reads everything from payment_reservations table.
+      const { data: result, error } = await supabase.rpc('process_stripe_payment_atomic', {
+        p_stripe_payment_intent_id: paymentIntent.id,
+        p_stripe_amount_pence: paymentIntent.amount,
+        p_stripe_currency: paymentIntent.currency
+      }).single();
+
+      if (error) {
+        console.error(`❌ Webhook: process_stripe_payment_atomic failed for ${paymentIntent.id}:`, error.message);
+        // Only ack (200) when NO reservation exists at all for this PaymentIntent —
+        // that is genuinely permanent and retrying can never fix it.
+        // Any other failure (e.g. "Invalid state for payment processing", which can
+        // occur if a reservation was cancelled) must return non-2xx so Stripe retries
+        // and the failure surfaces in the Stripe dashboard for manual investigation.
+        // Silently 200-acking those would risk a paid transaction never being credited.
+        if (error.message.includes('not found')) {
+          return res.json({ received: true, error: error.message });
+        }
+        return res.status(500).json({ error: 'Payment processing failed' });
+      }
+
+      if (result.already_processed) {
+        console.log(`✅ Webhook: Payment ${paymentIntent.id} already processed (idempotent)`);
+      } else {
+        console.log(`✅ Webhook: Payment ${paymentIntent.id} processed — ${result.credits_added} credits, balance ${result.balance_after}`);
+      }
+    } catch (err) {
+      console.error('Webhook processing error:', err);
+      return res.status(500).json({ error: 'Internal processing error' });
+    }
+  }
+
+  // Handle payment cancellation/failure — cancel the reservation
+  if (event.type === 'payment_intent.canceled' || event.type === 'payment_intent.payment_failed') {
+    const paymentIntent = event.data.object;
+
+    if (event.type === 'payment_intent.canceled') {
+      try {
+        const { error } = await supabase.rpc('cancel_processing_reservation', {
+          p_stripe_payment_intent_id: paymentIntent.id
+        }).single();
+
+        if (error) {
+          console.error(`Webhook: cancel_processing_reservation failed for ${paymentIntent.id}:`, error.message);
+        } else {
+          console.log(`✅ Webhook: Reservation cancelled for PI ${paymentIntent.id}`);
+        }
+      } catch (err) {
+        console.error('Webhook cancel error:', err);
+      }
+    }
+
+    // payment_intent.payment_failed: do NOT credit or cancel automatically.
+    // The reservation stays in 'processing' — customer can retry payment.
+    if (event.type === 'payment_intent.payment_failed') {
+      console.log(`⚠️ Webhook: Payment failed for PI ${paymentIntent.id} — reservation remains in processing`);
+    }
+  }
+
+  res.json({ received: true });
+});
+
 app.use(express.json());
 
 // Rate limiting
@@ -448,7 +548,7 @@ app.get('/api/companies', requireAdmin, async (req, res) => {
 app.get('/api/companies/:id', requireAuth, async (req, res) => {
   try {
     // Non-admin users can only view their own record
-    if (req.user.role !== 'admin' && req.user.id !== req.params.id) {
+    if (req.user.role !== 'admin' && String(req.user.id) !== req.params.id) {
       return res.status(403).json({ error: 'You can only view your own company' });
     }
 
@@ -479,7 +579,7 @@ app.get('/api/companies/:id', requireAuth, async (req, res) => {
 app.put('/api/companies/:id', requireAuth, async (req, res) => {
   try {
     // Contractors can only update their own record; admins can update any
-    if (req.user.role !== 'admin' && req.user.id !== req.params.id) {
+    if (req.user.role !== 'admin' && String(req.user.id) !== req.params.id) {
       return res.status(403).json({ error: 'You can only update your own company' });
     }
     const updates = { ...req.body, updated_at: new Date().toISOString() };
@@ -590,9 +690,7 @@ app.put('/api/leads/:id', requireAuth, async (req, res) => {
 // STRIPE PAYMENTS (Migration 003 — Reservation Architecture)
 // =====================
 // NOTE: No hardcoded CREDIT_PACKAGES. Database credit_packages table is authoritative.
-// Package pricing mismatch: server.js previously had starter/5/£49.99, professional/15/£129.99,
-// business/30/£199.99. Migration 003 seeds starter/10/£25, growth/25/£55, pro/60/£120.
-// Business must confirm correct package values before migration is applied.
+// Migration 003 seeds starter/5/£49.99, professional/15/£129.99, business/30/£199.99.
 
 // Helper: fetch package from DB (authoritative)
 async function getPackage(packageId) {
@@ -1312,95 +1410,6 @@ async function sendPushToCompany(companyId, { title, body, url, tag }) {
     return { success: false, reason: err.message };
   }
 }
-
-// =====================
-// STRIPE WEBHOOK (Migration 003 — Atomic RPC payment completion)
-// =====================
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  if (!stripe) {
-    return res.status(503).json({ error: 'Stripe not configured' });
-  }
-
-  const sig = req.headers['stripe-signature'];
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-  if (!webhookSecret) {
-    console.error('STRIPE_WEBHOOK_SECRET not set');
-    return res.status(500).json({ error: 'Webhook not configured' });
-  }
-
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-  } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
-    return res.status(400).json({ error: 'Invalid signature' });
-  }
-
-  // Handle payment success — ONLY authority for crediting payments
-  if (event.type === 'payment_intent.succeeded') {
-    const paymentIntent = event.data.object;
-
-    try {
-      // Call atomic RPC — handles reservation lookup, idempotency, credit grant,
-      // purchase record, credit ledger, and receipt outbox in one transaction.
-      // No Stripe metadata trust — RPC reads everything from payment_reservations table.
-      const { data: result, error } = await supabase.rpc('process_stripe_payment_atomic', {
-        p_stripe_payment_intent_id: paymentIntent.id,
-        p_stripe_amount_pence: paymentIntent.amount,
-        p_stripe_currency: paymentIntent.currency
-      }).single();
-
-      if (error) {
-        console.error(`❌ Webhook: process_stripe_payment_atomic failed for ${paymentIntent.id}:`, error.message);
-        // Return 200 to prevent Stripe retries on permanent failures (e.g. reservation not found)
-        // Return 500 only for transient errors that Stripe should retry
-        if (error.message.includes('not found') || error.message.includes('Invalid state')) {
-          return res.json({ received: true, error: error.message });
-        }
-        return res.status(500).json({ error: 'Payment processing failed' });
-      }
-
-      if (result.already_processed) {
-        console.log(`✅ Webhook: Payment ${paymentIntent.id} already processed (idempotent)`);
-      } else {
-        console.log(`✅ Webhook: Payment ${paymentIntent.id} processed — ${result.credits_added} credits, balance ${result.balance_after}`);
-      }
-    } catch (err) {
-      console.error('Webhook processing error:', err);
-      return res.status(500).json({ error: 'Internal processing error' });
-    }
-  }
-
-  // Handle payment cancellation/failure — cancel the reservation
-  if (event.type === 'payment_intent.canceled' || event.type === 'payment_intent.payment_failed') {
-    const paymentIntent = event.data.object;
-
-    if (event.type === 'payment_intent.canceled') {
-      try {
-        const { error } = await supabase.rpc('cancel_processing_reservation', {
-          p_stripe_payment_intent_id: paymentIntent.id
-        }).single();
-
-        if (error) {
-          console.error(`Webhook: cancel_processing_reservation failed for ${paymentIntent.id}:`, error.message);
-        } else {
-          console.log(`✅ Webhook: Reservation cancelled for PI ${paymentIntent.id}`);
-        }
-      } catch (err) {
-        console.error('Webhook cancel error:', err);
-      }
-    }
-
-    // payment_intent.payment_failed: do NOT credit or cancel automatically.
-    // The reservation stays in 'processing' — customer can retry payment.
-    if (event.type === 'payment_intent.payment_failed') {
-      console.log(`⚠️ Webhook: Payment failed for PI ${paymentIntent.id} — reservation remains in processing`);
-    }
-  }
-
-  res.json({ received: true });
-});
 
 // =====================
 // START SERVER
