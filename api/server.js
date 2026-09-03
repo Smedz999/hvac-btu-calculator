@@ -861,6 +861,8 @@ app.post('/api/internal/process-receipts', requireAdmin, async (req, res) => {
             <p>You bought ${job.credits_added} credits for £${(job.amount_pence / 100).toFixed(2)}.</p>
             <p>Your new balance: ${job.balance_after} credits</p>
             <p><a href="https://acconnx.com/company-portal.html">View Dashboard</a></p>`
+        }, {
+          idempotencyKey: `receipt/${job.reservation_id}`
         });
 
         const providerMessageId = emailResult?.id || emailResult?.data?.id || 'unknown';

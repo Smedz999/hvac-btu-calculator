@@ -1188,6 +1188,8 @@ function showApp() {
 async function loadDashboard() {
   if (!currentUser) return;
 
+  document.getElementById('dashCredits').textContent = currentUser.credits || 0;
+
   try {
     // Refresh user data from database to get live credit count
     const userRes = await fetch(`${API_URL}/companies/${currentUser.id}`, { headers: authHeaders() });
@@ -1198,6 +1200,7 @@ async function loadDashboard() {
       currentUser = { ...currentUser, ...freshUser };
       localStorage.setItem('hvac_current_user', JSON.stringify(currentUser));
       updateNavCredits();
+      document.getElementById('dashCredits').textContent = currentUser.credits || 0;
     }
 
     const res = await fetch(`${API_URL}/leads?companyId=${currentUser.id}`, { headers: authHeaders() });
