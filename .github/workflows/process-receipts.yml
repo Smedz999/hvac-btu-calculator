@@ -1,0 +1,25 @@
+name: Process Receipt Outbox
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call receipt processor
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          http_status=$(curl -sS -o /tmp/response.json -w '%{http_code}' \
+            -X GET "https://acconnx.com/api/internal/process-receipts" \
+            -H "Authorization: Bearer ${CRON_SECRET}")
+          echo "Response status: ${http_status}"
+          cat /tmp/response.json
+          if [ "${http_status}" -lt 200 ] || [ "${http_status}" -ge 300 ]; then
+            echo "Receipt processing endpoint returned a non-success status (${http_status})"
+            exit 1
+          fi

@@ -1,6 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { generateToken, generateAdminToken, requireAuth, requireAdmin } = require('./auth');
+const { generateToken, generateAdminToken, requireAuth, requireAdmin, requireCronSecret } = require('./auth');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const { createClient } = require('@supabase/supabase-js');
@@ -818,8 +818,17 @@ app.post('/api/admin/adjust-credits', requireAdmin, async (req, res) => {
 // =====================
 // RECEIPT WORKER (protected internal endpoint)
 // =====================
-app.post('/api/internal/process-receipts', requireAdmin, async (req, res) => {
+async function processReceiptJobs(req, res) {
   try {
+    // Reclaim jobs stuck in 'processing' for >10 minutes (e.g. a prior
+    // invocation crashed/timed out after claiming but before completing)
+    // before claiming any new work.
+    try {
+      await supabase.rpc('reclaim_stale_receipt_jobs');
+    } catch (reclaimErr) {
+      console.error('Stale receipt-job reclaim failed:', reclaimErr.message);
+    }
+
     const results = { claimed: 0, sent: 0, failed: 0, errors: [] };
 
     // Process up to 10 jobs per invocation
@@ -898,7 +907,12 @@ app.post('/api/internal/process-receipts', requireAdmin, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+}
+
+// Manual/admin trigger (existing behavior, unchanged auth)
+app.post('/api/internal/process-receipts', requireAdmin, processReceiptJobs);
+// Machine trigger for the external scheduler (GitHub Actions), separate auth
+app.get('/api/internal/process-receipts', requireCronSecret, processReceiptJobs);
 
 // =====================
 // ADMIN

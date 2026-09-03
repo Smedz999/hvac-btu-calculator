@@ -1,5 +1,6 @@
 // JWT Authentication Middleware
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) { console.error('❌ JWT_SECRET environment variable is required'); process.exit(1); }
@@ -59,4 +60,21 @@ function requireAdmin(req, res, next) {
   }
 }
 
-module.exports = { generateToken, generateAdminToken, requireAuth, requireAdmin };
+// Middleware: require a valid CRON_SECRET bearer token (machine-to-machine,
+// separate from admin JWT auth — used by the external receipt scheduler)
+function requireCronSecret(req, res, next) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    return res.status(500).json({ error: 'CRON_SECRET not configured' });
+  }
+  const authHeader = req.headers.authorization || '';
+  const provided = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const providedBuf = Buffer.from(provided);
+  const secretBuf = Buffer.from(secret);
+  if (providedBuf.length !== secretBuf.length || !crypto.timingSafeEqual(providedBuf, secretBuf)) {
+    return res.status(401).json({ error: 'Invalid cron secret' });
+  }
+  next();
+}
+
+module.exports = { generateToken, generateAdminToken, requireAuth, requireAdmin, requireCronSecret };
