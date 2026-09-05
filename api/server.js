@@ -874,7 +874,15 @@ async function processReceiptJobs(req, res) {
           idempotencyKey: `receipt/${job.reservation_id}`
         });
 
-        const providerMessageId = emailResult?.id || emailResult?.data?.id || 'unknown';
+        if (emailResult?.error) {
+          throw new Error(`Resend error: ${emailResult.error.message || JSON.stringify(emailResult.error)}`);
+        }
+
+        const providerMessageId = emailResult?.id || emailResult?.data?.id;
+
+        if (!providerMessageId) {
+          throw new Error('Resend response missing a valid provider message id');
+        }
 
         // Mark job as sent
         await supabase.rpc('complete_receipt_job', {
