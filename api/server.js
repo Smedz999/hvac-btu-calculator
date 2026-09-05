@@ -24,6 +24,15 @@ try {
 }
 
 const app = express();
+
+// Vercel puts exactly one trusted proxy hop (its own edge network) in front
+// of this function, which always sets X-Forwarded-For to the real client
+// IP. Without this, req.ip falls back to the internal socket peer address,
+// which collapses express-rate-limit's per-client buckets into one shared
+// bucket. Must stay a numeric hop count (not `true`) so a client cannot
+// spoof extra X-Forwarded-For entries to bypass rate limiting.
+app.set('trust proxy', 1);
+
 const port = process.env.PORT || 3001;
 
 // Supabase connection with better error handling
