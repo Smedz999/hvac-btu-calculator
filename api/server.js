@@ -657,18 +657,75 @@ app.post('/api/leads', leadLimiter, async (req, res) => {
   }
 });
 
+// Contractors can only ever move a lead through these statuses from the
+// portal UI (see company-portal.html updateLeadStatus callers). 'new' is
+// set only at lead creation and is deliberately excluded here so a
+// contractor cannot revert a lead back to unclaimed.
+const CONTRACTOR_ALLOWED_STATUSES = ['contacted', 'won', 'lost'];
+
+// Returns { data, error } on success, or { forbidden: true } for any role
+// other than 'admin'/'contractor' (fail closed, never inferred from an
+// absent/undefined identity).
+async function getLeadsForUser(user, companyIdParam, supabaseClient) {
+  if (user.role === 'admin') {
+    let query = supabaseClient.from('leads').select('*').order('created_at', { ascending: false });
+    if (companyIdParam) query = query.eq('assigned_to', companyIdParam);
+    const { data, error } = await query;
+    return { data, error };
+  }
+  if (user.role === 'contractor') {
+    // Ownership is derived only from the verified JWT — any client-supplied
+    // companyId is ignored so it cannot be used to read another company's leads.
+    const { data, error } = await supabaseClient
+      .from('leads')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .eq('assigned_to', user.id);
+    return { data, error };
+  }
+  return { forbidden: true };
+}
+
+// Returns { data, error } on success, { invalidStatus: true }, or
+// { forbidden: true } for any role other than 'admin'/'contractor'.
+async function updateLeadForUser(user, leadId, body, supabaseClient) {
+  if (user.role === 'admin') {
+    const updates = { ...body, updated_at: new Date().toISOString() };
+    delete updates.id;
+    const { data, error } = await supabaseClient
+      .from('leads')
+      .update(updates)
+      .eq('id', leadId)
+      .select()
+      .maybeSingle();
+    return { data, error };
+  }
+  if (user.role === 'contractor') {
+    if (!CONTRACTOR_ALLOWED_STATUSES.includes(body.status)) {
+      return { invalidStatus: true };
+    }
+    // Only status is ever written, and the WHERE clause enforces ownership
+    // atomically as part of the same update — a non-owner's request matches
+    // zero rows rather than being checked-then-acted-on separately.
+    const updates = { status: body.status, updated_at: new Date().toISOString() };
+    const { data, error } = await supabaseClient
+      .from('leads')
+      .update(updates)
+      .eq('id', leadId)
+      .eq('assigned_to', user.id)
+      .select()
+      .maybeSingle();
+    return { data, error };
+  }
+  return { forbidden: true };
+}
+
 app.get('/api/leads', requireAuth, async (req, res) => {
   try {
-    const { companyId } = req.query;
-    let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
-
-    if (companyId) {
-      query = query.eq('assigned_to', companyId);
-    }
-
-    const { data: leads, error } = await query;
-    if (error) throw error;
-    res.json(leads);
+    const result = await getLeadsForUser(req.user, req.query.companyId, supabase);
+    if (result.forbidden) return res.status(403).json({ error: 'Forbidden' });
+    if (result.error) throw result.error;
+    res.json(result.data);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -676,20 +733,15 @@ app.get('/api/leads', requireAuth, async (req, res) => {
 
 app.put('/api/leads/:id', requireAuth, async (req, res) => {
   try {
-    const updates = { ...req.body, updated_at: new Date().toISOString() };
-    delete updates.id;
+    const result = await updateLeadForUser(req.user, req.params.id, req.body, supabase);
+    if (result.forbidden) return res.status(403).json({ error: 'Forbidden' });
+    if (result.invalidStatus) return res.status(400).json({ error: 'Invalid status' });
+    if (result.error) throw result.error;
+    // Same 404 whether the id doesn't exist or exists but isn't owned by
+    // this contractor — never reveal which case it is.
+    if (!result.data) return res.status(404).json({ error: 'Lead not found' });
 
-    const { data: lead, error } = await supabase
-      .from('leads')
-      .update(updates)
-      .eq('id', req.params.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    if (!lead) return res.status(404).json({ error: 'Lead not found' });
-
-    res.json({ success: true, lead });
+    res.json({ success: true, lead: result.data });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1447,6 +1499,12 @@ async function sendPushToCompany(companyId, { title, body, url, tag }) {
 // =====================
 // START SERVER
 // =====================
+// Attached to the app function (not a separate module.exports shape) so the
+// Vercel entrypoint contract below is unchanged — tests reach these via
+// require('./server').getLeadsForUser / .updateLeadForUser.
+app.getLeadsForUser = getLeadsForUser;
+app.updateLeadForUser = updateLeadForUser;
+
 if (process.env.VERCEL) {
   module.exports = app;
 } else {
