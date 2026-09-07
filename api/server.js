@@ -1025,14 +1025,24 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
 // =====================
 // LEAD DISTRIBUTION
 // =====================
-async function distributeLead(lead) {
+// `deps` lets tests substitute the Supabase client, Resend client, and push
+// sender without changing any behavior when called with no second argument
+// (the real call site in POST /api/leads passes none, so production always
+// uses the same module-level singletons it always has).
+async function distributeLead(lead, deps = {}) {
+  const {
+    supabaseClient = supabase,
+    resendClient = resend,
+    sendPush = sendPushToCompany
+  } = deps;
+
   try {
     const leadPrefix = lead.postcode?.split(' ')[0];
     if (!leadPrefix) return [];
 
     // Find eligible companies (have credits, matching coverage area)
     // Check if lead prefix matches any of the company's coverage areas
-    const { data: allCompanies, error } = await supabase
+    const { data: allCompanies, error } = await supabaseClient
       .from('companies')
       .select('*')
       .gt('credits', 0);
@@ -1045,11 +1055,11 @@ async function distributeLead(lead) {
       // If no coverage areas set, fall back to old postcode matching
       if (!company.coverage_areas || company.coverage_areas.length === 0) {
         const companyPrefix = company.postcode?.split(' ')[0];
-        return companyPrefix === leadPrefix || 
+        return companyPrefix === leadPrefix ||
                companyPrefix?.substring(0, 2) === leadPrefix.substring(0, 2);
       }
       // Check if any coverage area matches the lead prefix
-      return company.coverage_areas.some(area => 
+      return company.coverage_areas.some(area =>
         leadPrefix.startsWith(area) || area.startsWith(leadPrefix)
       );
     });
@@ -1058,7 +1068,7 @@ async function distributeLead(lead) {
 
     // Count leads already received per company
     const companyIds = eligible.map(c => c.id);
-    const { data: leadCounts } = await supabase
+    const { data: leadCounts } = await supabaseClient
       .from('leads')
       .select('assigned_to')
       .in('assigned_to', companyIds)
@@ -1087,20 +1097,20 @@ async function distributeLead(lead) {
 
     // Update the original lead with the first company as primary assignee
     const firstCompany = selected[0];
-    await supabase
+    await supabaseClient
       .from('companies')
       .update({ credits: firstCompany.credits - 1, updated_at: new Date().toISOString() })
       .eq('id', firstCompany.id);
 
-    await supabase
+    await supabaseClient
       .from('leads')
       .update({ assigned_to: firstCompany.id, updated_at: new Date().toISOString() })
       .eq('id', lead.id);
 
     // Send notifications for first company
-    if (resend) {
+    if (resendClient) {
       try {
-        await resend.emails.send({
+        await resendClient.emails.send({
           from: 'ACConnx <leads@acconnx.com>',
           to: firstCompany.email,
           subject: '🔥 New Lead: ' + lead.customer_name + ' - ' + lead.postcode,
@@ -1120,7 +1130,7 @@ async function distributeLead(lead) {
     }
 
     try {
-      await sendPushToCompany(firstCompany.id, {
+      await sendPush(firstCompany.id, {
         title: '🔥 New Lead!',
         body: `${lead.customer_name} — ${lead.postcode}${lead.btu ? ' — ' + lead.btu.toLocaleString() + ' BTU' : ''}`,
         url: '/company-portal.html#leads',
@@ -1130,18 +1140,15 @@ async function distributeLead(lead) {
       console.log('Failed to send push notification:', e.message);
     }
 
-    // For companies 2 and 3, create child lead records referencing the original
+    // For companies 2 and 3, create child lead records referencing the
+    // original. The insert is attempted FIRST and its result inspected —
+    // credit is deducted and notifications are sent only if the row was
+    // actually created, so a failed insert (missing column, or any other
+    // reason) can never charge a contractor for a lead they'll never see.
     for (let i = 1; i < selected.length; i++) {
       const company = selected[i];
 
-      // Deduct credit
-      await supabase
-        .from('companies')
-        .update({ credits: company.credits - 1, updated_at: new Date().toISOString() })
-        .eq('id', company.id);
-
-      // Create child lead record with parent_lead_id pointing to the original
-      await supabase
+      const { error: childLeadError } = await supabaseClient
         .from('leads')
         .insert({
           customer_name: lead.customer_name,
@@ -1154,12 +1161,25 @@ async function distributeLead(lead) {
           status: 'new',
           assigned_to: company.id,
           parent_lead_id: lead.id
-        });
+        })
+        .select()
+        .maybeSingle();
+
+      if (childLeadError) {
+        console.error(`Secondary lead insert failed for company ${company.id}:`, childLeadError.message);
+        continue;
+      }
+
+      // Deduct credit
+      await supabaseClient
+        .from('companies')
+        .update({ credits: company.credits - 1, updated_at: new Date().toISOString() })
+        .eq('id', company.id);
 
       // Send email notification
-      if (resend) {
+      if (resendClient) {
         try {
-          await resend.emails.send({
+          await resendClient.emails.send({
             from: 'ACConnx <leads@acconnx.com>',
             to: company.email,
             subject: '🔥 New Lead: ' + lead.customer_name + ' - ' + lead.postcode,
@@ -1180,7 +1200,7 @@ async function distributeLead(lead) {
 
       // Send push notification
       try {
-        await sendPushToCompany(company.id, {
+        await sendPush(company.id, {
           title: '🔥 New Lead!',
           body: `${lead.customer_name} — ${lead.postcode}${lead.btu ? ' — ' + lead.btu.toLocaleString() + ' BTU' : ''}`,
           url: '/company-portal.html#leads',
@@ -1501,9 +1521,10 @@ async function sendPushToCompany(companyId, { title, body, url, tag }) {
 // =====================
 // Attached to the app function (not a separate module.exports shape) so the
 // Vercel entrypoint contract below is unchanged — tests reach these via
-// require('./server').getLeadsForUser / .updateLeadForUser.
+// require('./server').getLeadsForUser / .updateLeadForUser / .distributeLead.
 app.getLeadsForUser = getLeadsForUser;
 app.updateLeadForUser = updateLeadForUser;
+app.distributeLead = distributeLead;
 
 if (process.env.VERCEL) {
   module.exports = app;
