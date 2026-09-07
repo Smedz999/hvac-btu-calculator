@@ -1094,87 +1094,93 @@ async function distributeLead(lead, deps = {}) {
 
     // Take top 3
     const selected = eligible.slice(0, 3);
+    const notifiedCompanies = [];
 
-    // Update the original lead with the first company as primary assignee
+    // Primary contractor: assign_primary_lead() atomically locks the
+    // company row, verifies credits, claims the original lead (only if
+    // still unassigned), deducts one credit, and writes the ledger entry
+    // — all in one transaction. No credit arithmetic happens here in
+    // JavaScript, and notifications only fire once status === 'assigned'.
     const firstCompany = selected[0];
-    await supabaseClient
-      .from('companies')
-      .update({ credits: firstCompany.credits - 1, updated_at: new Date().toISOString() })
-      .eq('id', firstCompany.id);
+    const { data: primaryResult, error: primaryError } = await supabaseClient
+      .rpc('assign_primary_lead', {
+        p_lead_id: lead.id,
+        p_company_id: firstCompany.id
+      })
+      .maybeSingle();
 
-    await supabaseClient
-      .from('leads')
-      .update({ assigned_to: firstCompany.id, updated_at: new Date().toISOString() })
-      .eq('id', lead.id);
+    if (primaryError) {
+      console.error(`Primary lead assignment RPC error for company ${firstCompany.id}:`, primaryError.message);
+    } else if (!primaryResult || primaryResult.status !== 'assigned') {
+      console.error(`Primary lead assignment not completed for company ${firstCompany.id}: ${primaryResult?.status || 'no result'}`);
+    } else {
+      notifiedCompanies.push(firstCompany.company);
 
-    // Send notifications for first company
-    if (resendClient) {
+      if (resendClient) {
+        try {
+          await resendClient.emails.send({
+            from: 'ACConnx <leads@acconnx.com>',
+            to: firstCompany.email,
+            subject: '🔥 New Lead: ' + lead.customer_name + ' - ' + lead.postcode,
+            html: `<h1>New Lead Alert!</h1>
+              <p><strong>Customer:</strong> ${lead.customer_name}</p>
+              <p><strong>Email:</strong> ${lead.customer_email}</p>
+              <p><strong>Phone:</strong> ${lead.customer_phone || 'Not provided'}</p>
+              <p><strong>Postcode:</strong> ${lead.postcode}</p>
+              <p><strong>BTU Required:</strong> ${lead.btu?.toLocaleString() || 'Not calculated'}</p>
+              <p><strong>Room Type:</strong> ${lead.room_type || 'Not specified'}</p>
+              <p><a href="https://acconnx.com/company-portal.html">View in Dashboard</a></p>
+              <p><em>Contact within 15 minutes for best results!</em></p>`
+          });
+        } catch (e) {
+          console.log('Failed to send lead notification:', e.message);
+        }
+      }
+
       try {
-        await resendClient.emails.send({
-          from: 'ACConnx <leads@acconnx.com>',
-          to: firstCompany.email,
-          subject: '🔥 New Lead: ' + lead.customer_name + ' - ' + lead.postcode,
-          html: `<h1>New Lead Alert!</h1>
-            <p><strong>Customer:</strong> ${lead.customer_name}</p>
-            <p><strong>Email:</strong> ${lead.customer_email}</p>
-            <p><strong>Phone:</strong> ${lead.customer_phone || 'Not provided'}</p>
-            <p><strong>Postcode:</strong> ${lead.postcode}</p>
-            <p><strong>BTU Required:</strong> ${lead.btu?.toLocaleString() || 'Not calculated'}</p>
-            <p><strong>Room Type:</strong> ${lead.room_type || 'Not specified'}</p>
-            <p><a href="https://acconnx.com/company-portal.html">View in Dashboard</a></p>
-            <p><em>Contact within 15 minutes for best results!</em></p>`
+        await sendPush(firstCompany.id, {
+          title: '🔥 New Lead!',
+          body: `${lead.customer_name} — ${lead.postcode}${lead.btu ? ' — ' + lead.btu.toLocaleString() + ' BTU' : ''}`,
+          url: '/company-portal.html#leads',
+          tag: 'lead-' + Date.now()
         });
       } catch (e) {
-        console.log('Failed to send lead notification:', e.message);
+        console.log('Failed to send push notification:', e.message);
       }
     }
 
-    try {
-      await sendPush(firstCompany.id, {
-        title: '🔥 New Lead!',
-        body: `${lead.customer_name} — ${lead.postcode}${lead.btu ? ' — ' + lead.btu.toLocaleString() + ' BTU' : ''}`,
-        url: '/company-portal.html#leads',
-        tag: 'lead-' + Date.now()
-      });
-    } catch (e) {
-      console.log('Failed to send push notification:', e.message);
-    }
-
-    // For companies 2 and 3, create child lead records referencing the
-    // original. The insert is attempted FIRST and its result inspected —
-    // credit is deducted and notifications are sent only if the row was
-    // actually created, so a failed insert (missing column, or any other
-    // reason) can never charge a contractor for a lead they'll never see.
+    // Secondary contractors: assign_secondary_lead() atomically creates
+    // the child lead row (with parent_lead_id), deducts one credit, and
+    // writes the ledger entry as a single transaction — JavaScript no
+    // longer inserts the lead row or touches credits directly here.
     for (let i = 1; i < selected.length; i++) {
       const company = selected[i];
 
-      const { error: childLeadError } = await supabaseClient
-        .from('leads')
-        .insert({
-          customer_name: lead.customer_name,
-          customer_email: lead.customer_email,
-          customer_phone: lead.customer_phone,
-          postcode: lead.postcode,
-          btu: lead.btu,
-          room_type: lead.room_type,
-          property_type: lead.property_type,
-          status: 'new',
-          assigned_to: company.id,
-          parent_lead_id: lead.id
+      const { data: secondaryResult, error: secondaryError } = await supabaseClient
+        .rpc('assign_secondary_lead', {
+          p_parent_lead_id: lead.id,
+          p_company_id: company.id,
+          p_customer_name: lead.customer_name,
+          p_customer_email: lead.customer_email,
+          p_customer_phone: lead.customer_phone,
+          p_postcode: lead.postcode,
+          p_btu: lead.btu,
+          p_room_type: lead.room_type,
+          p_property_type: lead.property_type
         })
-        .select()
         .maybeSingle();
 
-      if (childLeadError) {
-        console.error(`Secondary lead insert failed for company ${company.id}:`, childLeadError.message);
+      if (secondaryError) {
+        console.error(`Secondary lead assignment RPC error for company ${company.id}:`, secondaryError.message);
         continue;
       }
 
-      // Deduct credit
-      await supabaseClient
-        .from('companies')
-        .update({ credits: company.credits - 1, updated_at: new Date().toISOString() })
-        .eq('id', company.id);
+      if (!secondaryResult || secondaryResult.status !== 'assigned') {
+        console.error(`Secondary lead assignment not completed for company ${company.id}: ${secondaryResult?.status || 'no result'}`);
+        continue;
+      }
+
+      notifiedCompanies.push(company.company);
 
       // Send email notification
       if (resendClient) {
@@ -1211,7 +1217,7 @@ async function distributeLead(lead, deps = {}) {
       }
     }
 
-    return selected.map(c => c.company);
+    return notifiedCompanies;
   } catch (err) {
     console.error('Lead distribution error:', err);
     return [];
