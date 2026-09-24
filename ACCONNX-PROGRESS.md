@@ -354,6 +354,40 @@ point every "RLS enabled, no policies, service_role bypasses it" table in this
 codebase (all nine of them, once 008 is applied) needs re-review, not just the
 new code.
 
+## Vercel Preview deployment attempt (2026-09-24) — BLOCKED on missing credentials
+
+Approval was given for exactly one Vercel Preview deployment of
+`sandbox/production-readiness-review` to verify the packaging fix. Before
+attempting anything, recorded state:
+- Branch: `sandbox/production-readiness-review`
+- Commit: `dc0f981f4e2aa7e1a042c48dc3c94386395bb651`
+- `git status`: clean, nothing to commit
+- Test suite: 130 passing assertions / 17 runnable files / 0 failures / 1
+  blocked (unchanged from the last report)
+
+**The deployment could not be performed from this session.** Checked, in order:
+- Vercel CLI: not installed (`vercel: command not found`), and `.vercel/`
+  (the project-link directory the CLI creates) does not exist in this
+  checkout — this local copy has never been linked to a Vercel project.
+- `VERCEL_TOKEN` environment variable: not set.
+- Any existing global Vercel CLI auth config on this machine (the usual
+  locations under the user profile): none found.
+- GitHub CLI (`gh`), which could at least confirm whether a Vercel-GitHub
+  integration exists for this repo's `origin` remote
+  (`github.com/Smedz999/hvac-btu-calculator`) without needing Vercel
+  credentials directly: not installed either.
+
+There is no path to authenticating with Vercel from this session without
+either (a) an interactive browser/email OAuth flow, which this non-interactive
+tool environment cannot complete, or (b) a pre-existing token, which does not
+exist here. This is a genuine credential/access blocker (stopping condition A
+from the original task brief), not something to work around — no attempt was
+made to solicit a token be pasted into the conversation, since that is not a
+safe way to hand credentials to an assistant.
+
+**Nothing was deployed, pushed, or otherwise changed as a result of this
+attempt.** See the report given to the user for what's needed to unblock this.
+
 ### Status at end of this session: all safely-completable phases done
 
 Phases 1, 2, 6 (except the documented pre-existing-tables RLS blocker), 7, 8,

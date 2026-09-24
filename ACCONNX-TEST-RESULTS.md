@@ -130,6 +130,17 @@ New tests this pass:
 | tests/migration-009-rls-unreferenced-tables.test.js | ✅ PASS | 5/5 |
 | tests/supabase-access-pattern.test.js | ✅ PASS | 3/3 |
 
+## Vercel Preview deployment attempt (2026-09-24)
+
+Not performed — blocked on missing Vercel credentials in this environment (no
+CLI installed, no `.vercel/` project link, no `VERCEL_TOKEN`, no existing auth
+config, no `gh` CLI to check for a GitHub integration either). See
+ACCONNX-PROGRESS.md for the full check. Pre-attempt snapshot recorded: commit
+`dc0f981f4e2aa7e1a042c48dc3c94386395bb651` on `sandbox/production-readiness-review`,
+clean working tree, 130/130 assertions passing (17 runnable files, 1 blocked,
+unchanged from prior report). No smoke testing was possible since no Preview
+URL was ever created.
+
 ## Final regression totals (this session)
 
 **130 passing assertions across 17 runnable test files, 0 failures, 1 file
