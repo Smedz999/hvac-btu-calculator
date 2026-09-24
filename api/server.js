@@ -118,9 +118,18 @@ app.use(cors({ origin: ['https://acconnx.com', 'https://www.acconnx.com', 'http:
 // first, req.body would already be a parsed object by the time this handler
 // runs, and constructEvent() would fail signature verification for every
 // real webhook delivery.
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  if (!stripe) {
-    return res.status(503).json({ error: 'Stripe not configured' });
+
+// Verifies the webhook signature and parses the event. Split out from event
+// handling so tests can exercise real signature verification (via the real
+// `stripe` library and a real webhook secret) independently of RPC dispatch
+// logic. `deps.stripeClient` defaults to the module-level `stripe` singleton
+// — the real route below never passes a second argument, so production
+// behavior is unchanged.
+function verifyStripeWebhookSignature(req, deps = {}) {
+  const { stripeClient = stripe } = deps;
+
+  if (!stripeClient) {
+    return { errorStatus: 503, errorBody: { error: 'Stripe not configured' } };
   }
 
   const sig = req.headers['stripe-signature'];
@@ -128,16 +137,28 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
   if (!webhookSecret) {
     console.error('STRIPE_WEBHOOK_SECRET not set');
-    return res.status(500).json({ error: 'Webhook not configured' });
+    return { errorStatus: 500, errorBody: { error: 'Webhook not configured' } };
   }
 
-  let event;
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    const event = stripeClient.webhooks.constructEvent(req.body, sig, webhookSecret);
+    return { event };
   } catch (err) {
     console.error('Webhook signature verification failed:', err.message);
-    return res.status(400).json({ error: 'Invalid signature' });
+    return { errorStatus: 400, errorBody: { error: 'Invalid signature' } };
   }
+}
+
+// Dispatches an already-verified Stripe event to the atomic payment RPCs and
+// returns the {status, body} the route should respond with. Pulled out of
+// the route handler so tests can inject a fake Supabase client and assert on
+// every branch (success, idempotent replay, unknown PaymentIntent, other RPC
+// failure, cancellation, payment_failed, unrecognized event types) without a
+// live database. `deps.supabaseClient` defaults to the module-level
+// `supabase` singleton — the real route below never passes a second
+// argument, so production behavior is unchanged.
+async function handleStripeWebhookEvent(event, deps = {}) {
+  const { supabaseClient = supabase } = deps;
 
   // Handle payment success — ONLY authority for crediting payments
   if (event.type === 'payment_intent.succeeded') {
@@ -147,7 +168,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       // Call atomic RPC — handles reservation lookup, idempotency, credit grant,
       // purchase record, credit ledger, and receipt outbox in one transaction.
       // No Stripe metadata trust — RPC reads everything from payment_reservations table.
-      const { data: result, error } = await supabase.rpc('process_stripe_payment_atomic', {
+      const { data: result, error } = await supabaseClient.rpc('process_stripe_payment_atomic', {
         p_stripe_payment_intent_id: paymentIntent.id,
         p_stripe_amount_pence: paymentIntent.amount,
         p_stripe_currency: paymentIntent.currency
@@ -162,9 +183,9 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         // and the failure surfaces in the Stripe dashboard for manual investigation.
         // Silently 200-acking those would risk a paid transaction never being credited.
         if (error.message.includes('not found')) {
-          return res.json({ received: true, error: error.message });
+          return { status: 200, body: { received: true, error: error.message } };
         }
-        return res.status(500).json({ error: 'Payment processing failed' });
+        return { status: 500, body: { error: 'Payment processing failed' } };
       }
 
       if (result.already_processed) {
@@ -174,7 +195,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       }
     } catch (err) {
       console.error('Webhook processing error:', err);
-      return res.status(500).json({ error: 'Internal processing error' });
+      return { status: 500, body: { error: 'Internal processing error' } };
     }
   }
 
@@ -184,7 +205,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
     if (event.type === 'payment_intent.canceled') {
       try {
-        const { error } = await supabase.rpc('cancel_processing_reservation', {
+        const { error } = await supabaseClient.rpc('cancel_processing_reservation', {
           p_stripe_payment_intent_id: paymentIntent.id
         }).single();
 
@@ -205,7 +226,17 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
     }
   }
 
-  res.json({ received: true });
+  return { status: 200, body: { received: true } };
+}
+
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const verification = verifyStripeWebhookSignature(req);
+  if (verification.errorStatus) {
+    return res.status(verification.errorStatus).json(verification.errorBody);
+  }
+
+  const result = await handleStripeWebhookEvent(verification.event);
+  res.status(result.status).json(result.body);
 });
 
 app.use(express.json());
@@ -1527,10 +1558,13 @@ async function sendPushToCompany(companyId, { title, body, url, tag }) {
 // =====================
 // Attached to the app function (not a separate module.exports shape) so the
 // Vercel entrypoint contract below is unchanged — tests reach these via
-// require('./server').getLeadsForUser / .updateLeadForUser / .distributeLead.
+// require('./server').getLeadsForUser / .updateLeadForUser / .distributeLead /
+// .verifyStripeWebhookSignature / .handleStripeWebhookEvent.
 app.getLeadsForUser = getLeadsForUser;
 app.updateLeadForUser = updateLeadForUser;
 app.distributeLead = distributeLead;
+app.verifyStripeWebhookSignature = verifyStripeWebhookSignature;
+app.handleStripeWebhookEvent = handleStripeWebhookEvent;
 
 if (process.env.VERCEL) {
   module.exports = app;
