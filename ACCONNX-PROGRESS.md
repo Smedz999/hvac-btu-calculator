@@ -354,7 +354,109 @@ point every "RLS enabled, no policies, service_role bypasses it" table in this
 codebase (all nine of them, once 008 is applied) needs re-review, not just the
 new code.
 
+## Vercel Preview deployment — COMPLETED and VERIFIED (2026-09-24, second attempt)
+
+Vercel CLI authentication was completed by the user locally (`npx vercel login`,
+account `smedz999`). This session then:
+
+1. **Identified the correct existing project without guessing.** `vercel project ls`
+   listed 7 projects in the `isla999` scope; `vercel domains inspect acconnx.com`
+   confirmed `acconnx.com` and `www.acconnx.com` are attached to exactly one of
+   them — `hvac-calculator` (project id `prj_mEn4nAlXeI386gVqPvfhvkfPVsVs`). Its
+   `Framework Preset: Other`, `Root Directory: .` settings also match this repo's
+   structure. Linked to this exact project only (`vercel link --project
+   hvac-calculator --scope isla999`); no new project was created.
+
+2. **Confirmed the historical failure before deploying anything new.**
+   `vercel inspect <url> --logs` on a real, previously-failed Production
+   deployment (16 days old, commit `7990520` — the exact commit this review's
+   Phase 1 identified as having 13 `.js` files under `/api`) showed precisely:
+   `Build Completed in /vercel/output [35s]` → `Deploying outputs...` →
+   `status ● Error`, with no further detail — matching the failure mode
+   described in the original task and every symptom this review diagnosed.
+
+3. **Deployed exactly once, Preview only.** `vercel deploy` (no `--prod` flag)
+   from `sandbox/production-readiness-review` at commit `dc0f981`. Result:
+   `target: preview`, `status: ● Ready`, deployment id
+   `dpl_2weqVP3puFpxiZsvei5GcM1vLpBx`, URL
+   `https://hvac-calculator-bh1rsw2dw-isla999.vercel.app`. Build log shows the
+   same `Build Completed` → `Deploying outputs...` sequence as the failed
+   deployment above, but this time followed by `Deployment completed` and
+   `Ready` — **directly confirms the packaging fix resolves the original
+   failure**, on the same project, same failure-prone code path (the `/api`
+   directory), not a different environment that happened to work.
+
+4. **Smoke-tested read-only, via `vercel curl`** (Preview URLs are behind
+   Vercel's own SSO Deployment Protection wall by default — plain `curl`
+   returns a 302 to `vercel.com/sso-api`; `vercel curl`, run under the CLI's own
+   authenticated session, bypasses this without needing any secret handling).
+   All results below.
+
+5. **Checked environment-variable scoping** with `vercel env ls` (names only,
+   no values ever requested or printed): every variable in this project
+   (`CRON_SECRET`, `JWT_SECRET`, `ADMIN_PASSWORD`, `RESEND_API_KEY`,
+   `SUPABASE_SERVICE_KEY`, `SUPABASE_URL`, `MONGODB_URI`, `STRIPE_SECRET_KEY`)
+   is scoped to **Production only** — none are available to Preview. This is
+   the definitive answer to "does Preview inherit production services": **no,
+   it inherits none of them.** Confirmed independently by the API's own
+   behavior: `GET /api/health` returned `500 FUNCTION_INVOCATION_FAILED`, and
+   `vercel logs` showed the exact cause: `❌ JWT_SECRET environment variable is
+   required` followed by the process exiting — `api/auth.js`'s module-level
+   guard (`if (!JWT_SECRET) { ...; process.exit(1); }`, reviewed and confirmed
+   correct in this review's Phase 6 security pass) fails closed exactly as
+   designed when a required secret is absent, rather than starting with an
+   insecure default. This is a pre-existing environment-configuration gap in
+   the Vercel project (Preview was never given its own copies of these
+   variables) — unrelated to anything changed in this branch, not a regression,
+   and not something this session added or fixed, since doing so would mean
+   either inventing a Preview secret unilaterally or reusing a production one,
+   neither of which was authorized.
+   **Practical consequence: no write-path testing was possible against the API
+   on this Preview, because the API could not run at all — which is also the
+   safest possible outcome for the goal of never touching a real database,
+   Stripe, or email service from Preview.**
+
+6. **Static/frontend smoke test results** (all via `vercel curl`, all
+   read-only GETs):
+
+   | Page | Result |
+   |---|---|
+   | `/` (homepage/calculator) | HTTP 200, 33.5KB. Contains the new hero copy ("Find the Right Air Conditioning for Your Home"), the new `leadForm`/`leadSubmitBtn` double-submit guard markup, "Local AC Installers" wording present, "Verified Installers" confirmed absent (0 matches) |
+   | `/privacy.html` | HTTP 200. New "How Long We Keep Your Data" retention section present |
+   | `/terms.html` | HTTP 200 |
+   | `/company-portal.html` (contractor login) | HTTP 200, 67.3KB, correct title |
+   | `/admin.html` (admin login) | HTTP 200, 32.2KB, correct title |
+   | `/manifest.json` | HTTP 200 |
+   | `/icons/icon-192x192.png` | HTTP 200, valid PNG (192x192, confirmed via `file`) |
+   | `/this-page-does-not-exist-xyz` | HTTP 404 (routing/fallback behaves correctly) |
+   | `/api/health` | HTTP 500 `FUNCTION_INVOCATION_FAILED` — see env-variable finding above; not a packaging regression |
+
+   **Not performed:** real-browser console-error checking or visual
+   mobile/responsive layout checking — no browser automation was available in
+   this session; everything above was verified via HTTP requests and static
+   HTML/asset inspection instead. This is a narrower check than a real browser
+   pass and should be flagged as such, not presented as equivalent to one.
+
+7. **Side effects on this checkout:** `vercel link` created `.vercel/`
+   (already gitignored, unchanged) and `.env.local` (a fresh Vercel OIDC
+   token, gitignored automatically by the CLI itself) and appended `.env*` to
+   `.gitignore`. No other files changed. Nothing was pushed. `vercel deploy`
+   was run exactly once, with no `--prod` flag, and no promotion command was
+   ever run.
+
+**Conclusion: the Vercel packaging/deployment fix is confirmed to resolve the
+original "Build Completed → Deploying outputs... → Error" failure**, verified
+against the same real project that produced the original failure, not a
+hypothetical. The one open item is unrelated to this fix: someone with access
+to the Vercel project's environment-variable settings needs to decide whether
+to add Preview-scoped copies of these secrets (using non-production values —
+e.g. a Stripe test-mode key, a separate/free-tier Supabase project — never the
+real production credentials) if full API-level Preview testing is wanted in
+future. That is a decision for the project owner, not something this session
+should do unilaterally.
+
 ## Vercel Preview deployment attempt (2026-09-24) — BLOCKED on missing credentials
+**(superseded by the successful attempt above — kept for the historical record)**
 
 Approval was given for exactly one Vercel Preview deployment of
 `sandbox/production-readiness-review` to verify the packaging fix. Before

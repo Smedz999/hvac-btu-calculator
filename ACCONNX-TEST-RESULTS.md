@@ -130,16 +130,34 @@ New tests this pass:
 | tests/migration-009-rls-unreferenced-tables.test.js | ✅ PASS | 5/5 |
 | tests/supabase-access-pattern.test.js | ✅ PASS | 3/3 |
 
-## Vercel Preview deployment attempt (2026-09-24)
+## Vercel Preview deployment — VERIFIED (2026-09-24, second attempt)
 
-Not performed — blocked on missing Vercel credentials in this environment (no
-CLI installed, no `.vercel/` project link, no `VERCEL_TOKEN`, no existing auth
-config, no `gh` CLI to check for a GitHub integration either). See
-ACCONNX-PROGRESS.md for the full check. Pre-attempt snapshot recorded: commit
-`dc0f981f4e2aa7e1a042c48dc3c94386395bb651` on `sandbox/production-readiness-review`,
-clean working tree, 130/130 assertions passing (17 runnable files, 1 blocked,
-unchanged from prior report). No smoke testing was possible since no Preview
-URL was ever created.
+Deployed successfully after the user completed `vercel login` locally. Full
+detail in ACCONNX-PROGRESS.md. Summary:
+
+- Linked to the correct existing project (`hvac-calculator`, confirmed via its
+  `acconnx.com`/`www.acconnx.com` domain attachment) — no new project created.
+- Deployment `dpl_2weqVP3puFpxiZsvei5GcM1vLpBx`, target `preview`, status
+  `Ready`. URL: `https://hvac-calculator-bh1rsw2dw-isla999.vercel.app`.
+- **Original failure confirmed resolved**: a real historical failed Production
+  deployment (commit `7990520`, the pre-fix commit) showed `Build Completed` →
+  `Deploying outputs...` → `Error`. This new deployment shows the identical
+  sequence but reaches `Ready` instead.
+- Static/frontend pages (homepage, privacy, terms, contractor portal, admin,
+  manifest, icons, 404 fallback): all HTTP 200/404 as expected, content
+  verified via `vercel curl` (bypasses Preview's SSO wall).
+- `/api/health`: HTTP 500 (`FUNCTION_INVOCATION_FAILED`) — root cause
+  confirmed via `vercel logs`: `JWT_SECRET environment variable is required`.
+  `vercel env ls` (names only, no values) confirms every secret in this
+  project (`CRON_SECRET`, `JWT_SECRET`, `ADMIN_PASSWORD`, `RESEND_API_KEY`,
+  `SUPABASE_SERVICE_KEY`, `SUPABASE_URL`, `MONGODB_URI`, `STRIPE_SECRET_KEY`)
+  is scoped to Production only, none to Preview. **This means Preview cannot
+  reach Supabase, Stripe, Resend, or Mongo at all** — the safest possible
+  outcome, and unrelated to the packaging fix (a pre-existing project
+  configuration gap, not a regression from this branch).
+- No browser-based console/visual/mobile checks were performed (no browser
+  automation available this session) — everything verified via HTTP/HTML
+  inspection instead.
 
 ## Final regression totals (this session)
 
