@@ -103,8 +103,35 @@ documented environment limitation).
    going live**, not a pure technical fix; flagged as such in the final
    report.
 
+## Supabase security review — second pass (real production RLS state)
+
+An independent read-only check of the live Supabase project reported exact
+current RLS state. Production was not touched. New local-only migrations and
+tests added in response — see ACCONNX-PROGRESS.md for the full access-path
+investigation.
+
+| Table | Reported state | Access path (confirmed by repo search) | Action |
+|---|---|---|---|
+| leads | RLS disabled | server-side, service-role only (11 refs) | migration 008: enable RLS, revoke anon/auth, no policies |
+| prospects | RLS disabled | server-side, service-role only, admin-gated (4 refs) | migration 008 |
+| tasks | RLS disabled | server-side, service-role only, admin-gated (4 refs) | migration 008 |
+| suppliers | RLS disabled | **unreferenced anywhere in this repo** | migration 009 (verify-first, not bundled with 008) |
+| products | RLS disabled | **unreferenced anywhere in this repo** | migration 009 |
+| orders | RLS disabled | **unreferenced anywhere in this repo** | migration 009 |
+| order_items | RLS disabled | **unreferenced anywhere in this repo** | migration 009 |
+| companies, credit_ledger, credit_packages, payment_reservations, purchases, receipt_outbox | RLS enabled, no policies | server-side, service-role only (migration 003's own design) | **confirmed intentional — no change** |
+| prevent_invalid_transitions | mutable search_path warning | n/a (trigger function) | already fixed by migration 007 (written before this check) — re-confirmed, no changes needed |
+
+New tests this pass:
+
+| File | Result | Assertions |
+|---|---|---|
+| tests/migration-008-rls-service-role-tables.test.js | ✅ PASS | 5/5 |
+| tests/migration-009-rls-unreferenced-tables.test.js | ✅ PASS | 5/5 |
+| tests/supabase-access-pattern.test.js | ✅ PASS | 3/3 |
+
 ## Final regression totals (this session)
 
-**117 passing assertions across 14 runnable test files, 0 failures, 1 file
+**130 passing assertions across 17 runnable test files, 0 failures, 1 file
 blocked (payment-architecture.test.js — documented environment limitation,
 unchanged since baseline).**

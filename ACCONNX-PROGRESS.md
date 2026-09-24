@@ -257,7 +257,104 @@ Findings (see also the "Lead Distribution" note above):
   deserves sign-off before building, per the instruction not to introduce a
   paid mapping service unilaterally. Not implemented either way this session.
 
-## Status at end of this session: all safely-completable phases done
+## Supabase security review (2026-09-24, second pass — real production RLS state)
+
+An independent read-only check of the live Supabase project (performed externally,
+not by this session — this session never touched production) reported the actual
+current RLS state, which this section reviews against. **No production changes
+were made in response to this — everything below is local-only proposed migrations
+and tests, per the explicit instruction not to modify Supabase.**
+
+**Reported RLS DISABLED (flagged by Supabase's advisor as exposed public tables):**
+`leads`, `prospects`, `tasks`, `suppliers`, `products`, `orders`, `order_items`.
+
+**Reported RLS ENABLED, no policies:** `companies`, `credit_ledger`,
+`credit_packages`, `payment_reservations`, `purchases`, `receipt_outbox` — this
+is exactly migration 003's own tables, and matches what this review already
+confirmed in the first pass as **intentional and correct** (see the RLS section
+above): the app uses only a custom-JWT/service-role architecture, migration 003's
+own inline comments say so explicitly, and `service_role` bypasses RLS. No policies
+added to these six per instruction #7 — doing so would be adding policies "merely
+to silence the advisor," which was explicitly ruled out.
+
+**Reported:** `prevent_invalid_transitions` has a mutable/unset search_path
+warning — this is the exact function migration 007 (written in the first pass of
+this review, before the external check) already hardens with
+`SET search_path = public, pg_temp`. Re-confirmed: migration 007 needs no changes.
+It only touches this one trigger function on `payment_reservations`, which is
+unrelated to any of the seven newly-reported tables, so the new schema information
+doesn't affect it.
+
+### Access-path investigation for the seven RLS-disabled tables
+
+Exhaustive repo search (not inference) before writing anything:
+- Every `createClient()` call anywhere in this repository —
+  `api/server.js`, `scripts/migrate-coverage-areas.js`, and
+  `tests/payment-architecture.test.js` (3 call sites total, verified by
+  `tests/supabase-access-pattern.test.js`) — is fed `SUPABASE_SERVICE_KEY`.
+  There is no anon-key or authenticated-session Supabase client anywhere.
+- `grep -rl "supabase" --include=*.html .` across all 14 HTML files in the repo:
+  zero matches. Confirmed independently by a pre-existing artifact already in
+  this repo, `chatgpt-review/03-tests-and-project-usage.txt` line 1205-1207,
+  from an earlier unrelated review: "Scanning all HTML files for
+  Supabase/createClient/anon key usage... (No matches found — zero frontend
+  Supabase access)." Two independent checks agree.
+- `leads`: 11 references in `server.js`, ALL through the single module-level
+  `supabase` (service-role) client — lead creation, admin stats, lead
+  distribution eligibility queries, `getLeadsForUser`/`updateLeadForUser`.
+  **Access path: server-side, service-role only.**
+- `prospects`: 4 references, all under `requireAdmin` routes
+  (`GET/POST /api/prospects`, `PUT/DELETE /api/prospects/:id`), all through
+  the same service-role client. **Access path: server-side, service-role only,
+  admin-gated at the application layer too.**
+- `tasks`: 4 references, same pattern as prospects
+  (`GET/POST /api/tasks`, `PUT/DELETE /api/tasks/:id`), all `requireAdmin`.
+  **Access path: server-side, service-role only, admin-gated.**
+- `suppliers`, `products`, `orders`, `order_items`: **zero references anywhere
+  in this repository** — no route, no frontend, no migration creates or
+  queries them. **Access path: unknown/legacy from this codebase's perspective.**
+  Not part of ACConnX as this repo defines it.
+
+### Proposed migrations (local only, NOT applied)
+
+**`api/migrations/008-enable-rls-service-role-only-tables.sql`** — enables RLS
+on `leads`, `prospects`, `tasks` with explicit `REVOKE ALL FROM anon,
+authenticated, PUBLIC` and **no policies**, mirroring migration 003's own
+established, already-working-in-production pattern exactly. Since every access
+path to these three tables is confirmed service-role-only, and service_role
+bypasses RLS, this changes nothing about what the application can do — it only
+closes the direct-PostgREST/anon-key exposure the advisor flagged. Static
+regression test: `tests/migration-008-rls-service-role-tables.test.js` (5 tests).
+**Confidence: high.** Caveat stated plainly in the migration's own header: this
+conclusion is scoped to what exists in this repository — if some consumer
+outside this codebase queries these tables directly via anon/authenticated key,
+this would break it. Nothing found suggests that, but this review has no
+visibility outside its own repo.
+
+**`api/migrations/009-lockdown-unreferenced-tables-VERIFY-FIRST.sql`** —
+same treatment (RLS + REVOKE, no policies, no new grants) for `suppliers`,
+`products`, `orders`, `order_items`. Deliberately kept as a **separate file**
+from 008, and its own header explicitly says not to apply it without first
+confirming nothing outside this repo depends on these tables (check row
+counts/recent activity in the Supabase dashboard; ask whoever has
+organizational context on this project). **Confidence: lower than 008** —
+this review can prove these tables are unused *by ACConnX's own code*, but
+cannot prove nothing else uses them. Static regression test:
+`tests/migration-009-rls-unreferenced-tables.test.js` (5 tests), including an
+explicit assertion that the file documents its own "verify first" warning.
+
+**`tests/supabase-access-pattern.test.js`** (3 tests) — a new permanent
+regression guard that encodes the safety argument behind migration 008 (and,
+retroactively, migration 003's own already-live pattern) as an executable
+check: every `createClient()` call must be traceably fed a `SERVICE`-named env
+var (never `ANON`/`PUBLISHABLE`), and no `.html` file may ever reference
+Supabase. If either ever becomes false — someone adds an anon-key client, or
+wires up client-side Supabase access — this test fails loudly, because at that
+point every "RLS enabled, no policies, service_role bypasses it" table in this
+codebase (all nine of them, once 008 is applied) needs re-review, not just the
+new code.
+
+### Status at end of this session: all safely-completable phases done
 
 Phases 1, 2, 6 (except the documented pre-existing-tables RLS blocker), 7, 8,
 9, 10 are complete. Phase 3/4 (test matrix / adversarial) is substantially
