@@ -176,10 +176,51 @@ to move non-handler files outside `/api` entirely:
   is the only way to fully confirm" — which requires your approval per the
   safety boundary (no deploys from this session).
 
-### GDPR / website copy review (not yet started)
-### Duplicate-submission / idempotency (not yet started)
-### Lead matching review (partially observed during Phase 1 read of `distributeLead()`
-in `server.js`):
+### GDPR / website copy review — DONE
+See commit "content: honest homeowner-facing copy + GDPR wording + frontend
+double-submit guard". Summary: removed "Verified Installers" (index.html,
+waitlist.html), "No Spam Guarantee", "Response in 24h", and "certified and
+reviewed" — none of these are true of the current system (no verification
+step exists anywhere in the codebase; terms.html itself already disclaims
+certificate verification). Replaced with factual equivalents. Repositioned
+the homeowner hero to the brief's requested copy and added the previously
+entirely-absent heating-capability line. Added an explicit data-sharing
+disclosure on the quote form itself (not just buried in the separate privacy
+page). Strengthened privacy.html's data-sharing sentence and added a
+retention section that didn't exist before. No marketing-consent checkbox
+exists anywhere in the product today, so "must not be mandatory" is
+trivially satisfied — but also nothing currently captures marketing consent
+at all; privacy.html now says plainly that quote data isn't used for
+marketing, which is an accurate description of current behavior, not a new
+promise. **This is content/copy, not a code fix — flagged for legal/business
+review before publishing, per the task's own instruction to separate
+technical changes from anything needing owner sign-off.**
+Not addressed (out of scope for a code review, needs a business decision):
+GA4 loads unconditionally on every page with no cookie-consent banner. Not
+changed — this needs a product/legal decision (consent banner vs. relying on
+another lawful basis), not a unilateral code change.
+
+### Duplicate-submission / idempotency — DONE
+See commit "fix: validate required lead fields and add duplicate-submission
+protection" and "content: ... frontend double-submit guard". Backend:
+`createLead()` in server.js now checks for an existing lead with the same
+(normalized) email + postcode created in the last 5 minutes before inserting;
+if found, returns it idempotently instead of creating a duplicate or
+re-running distribution. Frontend: the submit button now disables itself and
+shows a loading state for the duration of the request, so most double-clicks
+never even generate a second HTTP request. **Documented residual limitation:**
+the backend check is an application-level check-then-insert, not a
+DB-enforced uniqueness constraint, so it does not fully close the race
+between two requests that hit different server instances at the exact same
+instant. Closing that completely (e.g. a generated dedupe-bucket column +
+unique index + atomic RPC, following the same pattern as the payment/credit
+RPCs) needs a live Postgres to design and verify safely — blocked by the
+Phase 2 tooling gap, not skipped by choice. Given this is a lead-gen enquiry
+(not a payment), the blast radius of that residual race is small and
+self-correcting.
+
+### Lead matching review — DONE, recommendation documented, nothing external added
+Findings (see also the "Lead Distribution" note above):
 - Matching is postcode-prefix based only: primary match is
   `company.coverage_areas` containing/contained-by the lead's postcode prefix (text
   before the first space, e.g. "SW1A"); if a company has no `coverage_areas` set, it
@@ -194,20 +235,54 @@ in `server.js`):
 - Allocation fairness: eligible companies are sorted by fewest leads already received
   (ascending), tie-broken by most credits (descending) — a simple fairness heuristic,
   confirmed. Top 3 are selected.
-- Full writeup with recommendation goes in the final report; no paid mapping service
-  will be introduced without approval per instructions.
+- **Recommendation (not implemented — needs a product decision, not a code
+  fix):** `company.coverage_areas` (an explicit list of postcode-outward-code
+  strings the contractor chooses to serve) is already the primary, correct
+  mechanism and works fine as-is. The concern is the *fallback* path for
+  companies with no `coverage_areas` set: it matches on the company's own
+  postcode's first-two-characters against the lead's, which is a genuinely
+  crude proxy for "nearby" (e.g. postcode areas "SW" and "SE" share a
+  first-two-char prefix "S" only if both are literally two letters — for many
+  UK areas this fallback either barely matches anything or, worse, treats two
+  unrelated towns that happen to share a leading letter as adjacent; it does
+  not use `radius` or any real distance at all). Two honest options, both
+  requiring a business call: (a) treat `coverage_areas` as mandatory at
+  registration (remove the crude fallback entirely, forcing contractors to
+  explicitly declare where they work — simplest, safest, no new dependency),
+  or (b) implement real distance-based matching using `radius`, which requires
+  geocoding postcodes to coordinates — the free option is a static UK postcode
+  lookup dataset (e.g. the ONS postcode directory) bundled/loaded locally, no
+  external paid API and no per-request network call, but it's a real scope
+  increase (dataset size, one-time import, haversine distance calc) that
+  deserves sign-off before building, per the instruction not to introduce a
+  paid mapping service unilaterally. Not implemented either way this session.
 
-## Next steps (resume point if session ends here)
-1. Write `ACCONNX-TEST-PLAN.md` and `ACCONNX-TEST-RESULTS.md` (this file references
-   them — create immediately after this checkpoint).
-2. Local commit of the three tracking docs + sandbox branch checkpoint.
-3. Vercel packaging investigation (evidence-based) + local structural fix + test.
-4. Harden `prevent_invalid_transitions()` search_path (migration 007, local only) +
-   regression test in the style of `migration-006...test.js`.
-5. New offline adversarial test files for: credit-system attacks, Stripe
-   package/price manipulation, webhook signature/replay handling, admin authz,
-   duplicate-lead-submission idempotency — following the established fake-Supabase-client
-   pattern.
-6. GDPR/website copy review of `privacy.html`, `terms.html`, `index.html`,
-   `waitlist.html`, `for-contractors.html`.
-7. Full regression run + gap analysis + final report.
+## Status at end of this session: all safely-completable phases done
+
+Phases 1, 2, 6 (except the documented pre-existing-tables RLS blocker), 7, 8,
+9, 10 are complete. Phase 3/4 (test matrix / adversarial) is substantially
+built out for every high-risk area identified (auth boundary, credit/price
+manipulation, Stripe webhook, lead submission/dedup, Vercel packaging) but is
+NOT an exhaustive implementation of every single bullet in
+`ACCONNX-TEST-PLAN.md` — that document's checkboxes are the authoritative
+record of what's covered ([x]) vs. still open ([ ]) vs. blocked ([B]) for
+anyone resuming this work. Phase 11 (full regression) has been run repeatedly
+throughout, not just once at the end.
+
+## If resuming this work later, in priority order:
+1. Highest-value remaining test gaps per `ACCONNX-TEST-PLAN.md`'s open [ ]
+   items: admin-route-specific authz tests (company/purchase visibility),
+   direct offline tests of the eligibility-filter + fairness-sort logic in
+   `distributeLead()` in isolation (currently only exercised indirectly),
+   concurrent-simultaneous-lead-submission simulation at the JS level.
+2. If a real sandbox Supabase project or local Postgres ever becomes
+   available: re-run `tests/payment-architecture.test.js` for real, and
+   design a genuinely DB-enforced duplicate-lead guard (see the Lead
+   Matching / Duplicate-submission sections above) plus real concurrency
+   proof for migrations 003/006/007.
+3. Business decisions flagged above and not resolved by this session: the
+   lead-matching fallback strategy (mandatory coverage_areas vs. real
+   distance matching), whether to add a cookie-consent banner for GA4, legal
+   review and publish of the copy changes in this branch.
+4. Everything in this branch is local-only. Nothing has been pushed, merged,
+   or deployed.

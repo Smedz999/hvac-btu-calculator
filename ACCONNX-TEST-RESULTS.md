@@ -69,3 +69,42 @@ documented environment limitation).
    added `tests/vercel-function-count.test.js` as a permanent regression guard.
    Verified: full existing suite still green (68/68), moved files' syntax and
    module resolution confirmed working.
+2. `prevent_invalid_transitions()` hardened with `SECURITY DEFINER` + pinned
+   `search_path` via local-only migration 007. Static regression test added.
+3. `npm audit fix` applied to `api/` — 3 moderate `qs` (DoS/bypass, via
+   express/body-parser) vulnerabilities resolved, patch/minor bumps within
+   existing semver ranges. `npm audit` now reports 0 vulnerabilities.
+4. **POST /api/leads hardened**: required-field validation (customerName,
+   customerEmail with format check, postcode) added — previously accepted
+   leads with none of these present. Duplicate-submission protection added
+   (5-minute window, same email+postcode → idempotent return of the existing
+   lead, no re-distribution). 9 new offline tests.
+5. **Stripe webhook route refactored for testability** (behavior unchanged,
+   verified via full regression) and given 17 new offline tests — previously
+   zero coverage on the single route with sole authority to grant paid
+   credits.
+6. **10 new auth-middleware tests** (`requireAuth`/`requireAdmin`) — forged
+   tokens, tampered role claims, `alg:none`, expired tokens, malformed
+   headers — previously untested directly.
+7. **8 new credit/price-manipulation static invariant tests** pinning down
+   protections already present in the code (credits/password always
+   stripped from the generic company-update route; payment amount/currency
+   always server-derived; company id always JWT-derived).
+8. **Frontend**: `index.html` lead-submission button now disables and shows
+   a loading state during the request (complements the backend dedup fix);
+   a 4xx validation response now shows the specific error via toast instead
+   of destroying the whole form.
+9. **Website copy**: removed unsupported "Verified Installers" / "No Spam
+   Guarantee" / "Response in 24h" / "certified and reviewed" claims from
+   `index.html` and `waitlist.html`, replaced with factual wording;
+   repositioned the homeowner hero copy and added the (previously absent)
+   heating-capability line; strengthened `privacy.html`'s data-sharing and
+   retention wording. **Content change — needs legal/business review before
+   going live**, not a pure technical fix; flagged as such in the final
+   report.
+
+## Final regression totals (this session)
+
+**117 passing assertions across 14 runnable test files, 0 failures, 1 file
+blocked (payment-architecture.test.js — documented environment limitation,
+unchanged since baseline).**
