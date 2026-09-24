@@ -539,8 +539,9 @@
 
   <section class="hero">
     <div class="hero-content">
-      <h1>Professional AC Sizing Tool</h1>
-      <p>Calculate the perfect air conditioner size for your space. Accurate BTU estimates in seconds.</p>
+      <h1>Find the Right Air Conditioning for Your Home</h1>
+      <p>Get a free estimate of the system size your room needs, then request quotes from local AC installers.</p>
+      <p style="font-size: 0.9375rem; opacity: 0.85; margin-top: 0.5rem;">Modern air conditioning systems can provide both cooling and efficient heating.</p>
     </div>
   </section>
 
@@ -663,11 +664,11 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             Get 3 Quotes
           </div>
-          <div class="card-subtitle">Connect with verified local installers</div>
+          <div class="card-subtitle">Connect with local AC installers</div>
         </div>
 
         <p style="font-size: 0.9375rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-          Enter your details and we'll match you with up to 3 qualified HVAC contractors in your area.
+          Enter your details and we'll match you with up to 3 local AC installers in your area. No obligation.
         </p>
 
         <form id="leadForm" onsubmit="event.preventDefault(); submitLead();">
@@ -700,24 +701,28 @@
             </select>
           </div>
 
-          <button type="submit" class="btn btn-primary">
+          <button type="submit" class="btn btn-primary" id="leadSubmitBtn">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-            Get Free Quotes
+            <span id="leadSubmitBtnLabel">Get Free Quotes</span>
           </button>
+
+          <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.75rem;">
+            We'll use these details to process your enquiry and may share them with up to 3 relevant local AC installers, who may contact you about your request. See our <a href="/privacy.html">Privacy Policy</a>.
+          </p>
         </form>
 
         <div class="trust-badges">
           <div class="trust-badge">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            Verified Installers
+            Local AC Installers
           </div>
           <div class="trust-badge">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            No Spam Guarantee
+            No Obligation
           </div>
           <div class="trust-badge">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-            Response in 24h
+            Up to 3 Installers
           </div>
         </div>
       </div>
@@ -892,7 +897,15 @@
       document.getElementById('resultBox').classList.add('visible');
     }
 
+    let leadSubmitInFlight = false;
+
     async function submitLead() {
+      // Guards against a double-click or a second Enter-key submit firing a
+      // duplicate request while the first one is still in flight — the
+      // backend also protects against duplicate leads, but stopping the
+      // second click here means most people never even trigger that path.
+      if (leadSubmitInFlight) return;
+
       const name = document.getElementById('leadName').value.trim();
       const email = document.getElementById('leadEmail').value.trim();
       const postcode = document.getElementById('leadPostcode').value.trim();
@@ -913,6 +926,12 @@
         createdAt: new Date().toISOString()
       };
 
+      const submitBtn = document.getElementById('leadSubmitBtn');
+      const submitBtnLabel = document.getElementById('leadSubmitBtnLabel');
+      leadSubmitInFlight = true;
+      submitBtn.disabled = true;
+      submitBtnLabel.textContent = 'Sending…';
+
       try {
         const res = await fetch('/api/leads', {
           method: 'POST',
@@ -923,12 +942,27 @@
         if (res.ok) {
           showToast('Thanks! We\'ll connect you with local installers shortly.');
           document.getElementById('leadForm').reset();
+        } else if (res.status >= 400 && res.status < 500) {
+          // A validation error (e.g. a malformed email) — recoverable, so
+          // tell the user what to fix rather than discarding what they typed.
+          let message = 'Please check your details and try again.';
+          try {
+            const body = await res.json();
+            if (body && body.error) message = body.error;
+          } catch (e) { /* non-JSON error body, use the default message */ }
+          showToast(message);
         } else {
           throw new Error('API failed');
         }
       } catch (err) {
         document.getElementById('leadForm').innerHTML = '<div style="text-align:center;padding:2rem;"><h2 style="color:var(--primary);margin-bottom:0.5rem;">Something went wrong</h2><p style="color:var(--text-secondary);margin-bottom:1rem;">Please try again or call us directly.</p><button onclick="location.reload()" style="padding:0.75rem 2rem;background:var(--accent);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:1rem;">Try Again</button></div>';
+        return;
+      } finally {
+        leadSubmitInFlight = false;
       }
+
+      submitBtn.disabled = false;
+      submitBtnLabel.textContent = 'Get Free Quotes';
     }
 
     function showToast(message) {
