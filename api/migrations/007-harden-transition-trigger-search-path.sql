@@ -21,6 +21,21 @@
 -- run against a database that already has migration 003 applied. Does not
 -- touch the trigger definition itself (DROP/CREATE TRIGGER in 003), which is
 -- unaffected by replacing the function body it points to.
+--
+-- UPDATE (verified against the isolated ACConnX-Test Supabase project after
+-- migrations 003-009 were applied there): Supabase's Security Advisor flagged
+-- a second, separate issue once search_path was fixed above — making this
+-- function SECURITY DEFINER (needed for the search_path pin itself) without
+-- also revoking EXECUTE from anon/authenticated/PUBLIC left it directly
+-- callable by those roles with owner privileges, exactly the same class of
+-- gap migration 003 already closes for every real RPC function via explicit
+-- REVOKE statements. A trigger function has no legitimate reason to be
+-- callable directly at all (only the trigger mechanism itself should invoke
+-- it), so this revokes it the same way. Verified in ACConnX-Test: after
+-- applying the three REVOKE statements below, the Security Advisor's
+-- SECURITY DEFINER execution warning for this function disappeared
+-- completely. REVOKE is idempotent — safe to run multiple times, and a no-op
+-- if the privilege was never granted.
 
 CREATE OR REPLACE FUNCTION prevent_invalid_transitions()
 RETURNS TRIGGER
@@ -61,3 +76,10 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+-- Only the trigger mechanism itself should ever invoke this function —
+-- revoke direct EXECUTE from every non-owner role, matching migration 003's
+-- REVOKE pattern for its real RPCs.
+REVOKE EXECUTE ON FUNCTION prevent_invalid_transitions() FROM anon;
+REVOKE EXECUTE ON FUNCTION prevent_invalid_transitions() FROM authenticated;
+REVOKE EXECUTE ON FUNCTION prevent_invalid_transitions() FROM PUBLIC;

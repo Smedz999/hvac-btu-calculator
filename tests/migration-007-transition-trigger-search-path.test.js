@@ -68,11 +68,38 @@ function test4_IsIdempotentCreateOrReplace() {
   console.log('  ✅ PASS');
 }
 
-function test5_DoesNotTouchTriggerDefinitionOrOtherObjects() {
-  console.log('TEST 5: migration 007 touches only the function body, nothing else...');
+function test5_DoesNotTouchTriggerDefinitionOrCreateNewObjects() {
+  console.log('TEST 5: migration 007 touches only the existing function (body + grants), nothing else...');
   assert(!/CREATE TABLE/i.test(migration007Src), 'Should not create tables');
   assert(!/DROP TRIGGER/i.test(migration007Src), 'Should not touch the trigger — replacing the function is sufficient');
-  assert(!/GRANT|REVOKE/i.test(migration007Src), 'Should not touch grants — same function name/signature/owner, no new object');
+  assert(!/CREATE POLICY/i.test(migration007Src), 'Should not add RLS policies — out of scope for this function');
+  console.log('  ✅ PASS');
+}
+
+// Verified against the isolated ACConnX-Test Supabase project: after
+// migrations 003-009 were applied, Supabase's Security Advisor flagged
+// prevent_invalid_transitions() as SECURITY DEFINER but still executable by
+// anon/authenticated — i.e. hardening the search_path (test 1, above) without
+// also revoking EXECUTE left this trigger-only function directly callable by
+// unprivileged roles with owner privileges. Applying the three REVOKE
+// statements below in ACConnX-Test made that specific advisor warning
+// disappear completely.
+function test6_RevokesExecuteFromAnonAuthenticatedAndPublic() {
+  console.log('TEST 6: EXECUTE is revoked from anon, authenticated, and PUBLIC (fixes the SECURITY DEFINER execution warning verified in ACConnX-Test)...');
+  const expectedRevokes = [
+    'REVOKE EXECUTE ON FUNCTION prevent_invalid_transitions() FROM anon;',
+    'REVOKE EXECUTE ON FUNCTION prevent_invalid_transitions() FROM authenticated;',
+    'REVOKE EXECUTE ON FUNCTION prevent_invalid_transitions() FROM PUBLIC;'
+  ];
+  for (const stmt of expectedRevokes) {
+    assert(migration007Src.includes(stmt), `Expected exact statement: ${stmt}`);
+  }
+  // Must come after the CREATE OR REPLACE FUNCTION — revoking EXECUTE on a
+  // function that doesn't exist yet would fail.
+  const createIdx = migration007Src.indexOf('CREATE OR REPLACE FUNCTION prevent_invalid_transitions()');
+  const firstRevokeIdx = migration007Src.indexOf('REVOKE EXECUTE ON FUNCTION prevent_invalid_transitions()');
+  assert(createIdx !== -1 && firstRevokeIdx !== -1 && firstRevokeIdx > createIdx,
+    'REVOKE statements must come after the function is (re)created');
   console.log('  ✅ PASS');
 }
 
@@ -82,7 +109,8 @@ function runTests() {
   test2_PreservesOriginalTransitionLogicExactly();
   test3_OriginalMigration003DefinitionIsUnmodified();
   test4_IsIdempotentCreateOrReplace();
-  test5_DoesNotTouchTriggerDefinitionOrOtherObjects();
+  test5_DoesNotTouchTriggerDefinitionOrCreateNewObjects();
+  test6_RevokesExecuteFromAnonAuthenticatedAndPublic();
   console.log('\n✅ All migration 007 shape tests passed!');
 }
 
