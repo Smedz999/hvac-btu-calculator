@@ -126,19 +126,55 @@ All 8 offline test files pass cleanly, 0 failures:
   since the backend only ever uses the service key).
 - Full route-by-route authz re-audit of `server.js` still in progress (see test plan).
 
-### Vercel deployment investigation (not yet started — next up)
-Working hypothesis based on repo layout: `vercel.json` has no `functions`/`builds`
-key, so Vercel's zero-config detection auto-treats **every** `.js` file under `/api`
-as its own serverless function — including `api/tests/*.test.js` (9 files, one of
-which imports `dotenv` with a relative path and expects to run under `node tests/x.js`,
-not as a Vercel function handler), `api/migrate-coverage-areas.js`, and `api/auth.js`
-(a non-Express helper module, not a route handler). This needs verifying (not assumed)
-before proposing a fix. Plan: inspect Vercel's actual function-discovery rules for this
-project layout, then the safest fix is almost certainly excluding `api/tests/` and any
-non-handler `.js` from function discovery (via `.vercelignore` and/or explicit
-`functions` config in `vercel.json`) — tested locally by confirming `server.js` still
-serves correctly and the excluded files are inert, since we cannot actually deploy to
-verify.
+### Vercel deployment investigation — RESOLVED with evidence, fix applied and tested
+Confirmed via Vercel's own current docs (https://vercel.com/docs/functions/runtimes#functions-created-per-deployment,
+fetched during this review): "When using other frameworks, or Vercel Functions
+directly without a framework, every API maps directly to one Vercel Function...
+For Hobby, this approach is limited to 12 Vercel Functions per deployment."
+This project has no framework Vercel recognizes (static HTML + a bare `/api`
+directory), and `vercel.json` has no `functions`/`builds` key, so zero-config
+detection applies. Before the fix, `/api` contained **13** `.js` files: `index.js`,
+`auth.js`, `server.js`, `migrate-coverage-areas.js`, plus **9 files under
+`api/tests/*.test.js`** — one over the Hobby limit. Those 9 test files were added
+across exactly the lead-distribution hardening commits the user flagged
+(`7990520`, `c38212e`, `f7b024d`, `95e84a4`, `f773cd9`, `4785e5f`, `314179b`,
+`4b0f46c`), which lines up precisely with "the hardened version previously
+completed its build, reached Deploying outputs, then failed" — the test suite
+built up during that exact work pushed the function count over the line.
+Per Vercel's own official guidance (confirmed via a maintainer response in
+https://github.com/vercel/community/discussions/46 — there is no supported
+per-file exclusion for a vanilla `/api` project, e.g. `.vercelignore` cannot
+safely exclude a file another function still needs to `require()`), the fix is
+to move non-handler files outside `/api` entirely:
+- `api/tests/` → `tests/` (repo root)
+- `api/migrate-coverage-areas.js` → `scripts/migrate-coverage-areas.js`
+- Fixed every relative path inside the moved files (`__dirname`-relative
+  references to `server.js`, `auth.js`, the migration `.sql` files, and `.env`
+  all updated from `../X` to `../api/X`), and fixed three places where moved
+  files did a bare `require('express')` / `require('dotenv')` /
+  `require('@supabase/supabase-js')` — those packages only live in
+  `api/node_modules`, not a top-level `node_modules`, so bare requires broke
+  after the move; changed to resolve explicitly via
+  `require(path.join(__dirname, '../api/node_modules/<pkg>'))`.
+- `/api` now contains exactly 3 `.js` files (`index.js`, `auth.js`, `server.js`)
+  — well under the limit.
+- **Verified locally:** all 8 previously-passing offline test files still pass
+  from their new location (65/65 assertions, identical to baseline).
+  `payment-architecture.test.js` now correctly fails only at the expected/blocked
+  network step (no live server), not at a module-resolution error — confirming
+  the move didn't break it either.
+- **New regression test added:** `tests/vercel-function-count.test.js` — fails
+  loudly if `api/tests/` or `api/scripts/` reappear, if the total `.js` file
+  count under `/api` (recursive) exceeds a safe threshold (8, well under
+  Vercel's 12), or if an unexpected file appears directly under `/api`. This
+  guards against the exact same mistake recurring.
+- **Not verified (cannot be, without deploying):** that this was the *only*
+  contributing cause, or that Vercel's current count-detection logic is
+  unchanged from what the docs describe. This is a confident, evidence-based
+  fix, not a deploy-confirmed one — flagged clearly in the final report as
+  "local fix applied and tested; a real Vercel deploy (Preview, not Production)
+  is the only way to fully confirm" — which requires your approval per the
+  safety boundary (no deploys from this session).
 
 ### GDPR / website copy review (not yet started)
 ### Duplicate-submission / idempotency (not yet started)

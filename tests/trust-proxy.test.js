@@ -12,15 +12,18 @@
 // external network — the IP-resolution test spins up a real Express app on
 // a loopback-only ephemeral port and talks to it over 127.0.0.1.
 //
-// Run with: node api/tests/trust-proxy.test.js
+// Run with: node tests/trust-proxy.test.js
 
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
-const express = require('express');
 
-const serverSrc = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+const serverSrc = fs.readFileSync(path.join(__dirname, '../api/server.js'), 'utf8');
+// express lives in api/node_modules (this file sits outside api/ on purpose —
+// see the Vercel function-count fix — so it isn't hoisted to a shared
+// top-level node_modules).
+const express = require(path.join(__dirname, '../api/node_modules/express'));
 
 function test1_TrustProxySetToExactlyOne() {
   console.log('TEST 1: trust proxy is set to exactly 1...');

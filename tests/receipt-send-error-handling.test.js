@@ -6,13 +6,13 @@
 // Offline/pure: does not touch the database, Stripe, or Resend, and does
 // not require the server to be running. Safe to run anytime.
 //
-// Run with: node api/tests/receipt-send-error-handling.test.js
+// Run with: node tests/receipt-send-error-handling.test.js
 
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-const serverSrc = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+const serverSrc = fs.readFileSync(path.join(__dirname, '../api/server.js'), 'utf8');
 
 // Mirrors the send-outcome validation added to the receipt worker in
 // api/server.js: a Resend error, or a response with no id in either the

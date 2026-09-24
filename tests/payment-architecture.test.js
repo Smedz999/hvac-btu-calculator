@@ -1,14 +1,16 @@
 // ACConnx Payment Architecture Tests
 // Adapted for custom JWT architecture (NOT Supabase Auth)
 // companies.id is BIGINT, purchases.company_id is BIGINT
-// Run with: node api/tests/payment-architecture.test.js
+// Run with: node tests/payment-architecture.test.js
 // Requires: Server running on localhost:3001, migration 003 applied
 
 const assert = require('assert');
 const path = require('path');
 
-// Load environment variables from api/.env
-require('dotenv').config({ path: path.join(__dirname, '../.env') });
+// Load environment variables from api/.env. dotenv lives in api/node_modules
+// (this file sits outside api/ on purpose — see the Vercel function-count
+// fix — so it isn't hoisted to a shared top-level node_modules).
+require(path.join(__dirname, '../api/node_modules/dotenv')).config({ path: path.join(__dirname, '../api/.env') });
 
 const API_BASE = process.env.API_BASE || 'http://localhost:3001/api';
 let adminToken = null;
@@ -27,9 +29,12 @@ async function api(endpoint, options = {}) {
   return { status: res.status, data };
 }
 
-// Helper: get Supabase client for direct DB access (service_role)
+// Helper: get Supabase client for direct DB access (service_role).
+// @supabase/supabase-js lives in api/node_modules, not a top-level
+// node_modules (this file sits outside api/ on purpose — see the Vercel
+// function-count fix), so it's resolved explicitly from there.
 function getSupabase() {
-  const { createClient } = require('@supabase/supabase-js');
+  const { createClient } = require(path.join(__dirname, '../api/node_modules/@supabase/supabase-js'));
   return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 }
 

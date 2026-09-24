@@ -27,7 +27,7 @@
 // once per company instead of doing its own read-then-write, and
 // (b) correctly branches notifications on the RPC's reported outcome.
 //
-// Run with: node api/tests/distribute-lead-secondary-insert.test.js
+// Run with: node tests/distribute-lead-secondary-insert.test.js
 
 const assert = require('assert');
 const fs = require('fs');
@@ -39,9 +39,9 @@ process.env.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'offline-test-admin';
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'http://127.0.0.1:0';
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'offline-test-key';
 
-const app = require(path.join(__dirname, '../server.js'));
+const app = require(path.join(__dirname, '../api/server.js'));
 const { distributeLead } = app;
-const serverSrc = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+const serverSrc = fs.readFileSync(path.join(__dirname, '../api/server.js'), 'utf8');
 
 assert.strictEqual(typeof distributeLead, 'function', 'server.js must export distributeLead on app');
 

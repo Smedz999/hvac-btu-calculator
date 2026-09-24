@@ -7,14 +7,14 @@
 // file's raw text and asserts on its shape, following the same convention
 // as api/tests/receipt-cron-auth.test.js (tests 7-9) for migration 004.
 //
-// Run with: node api/tests/migration-005-parent-lead-id.test.js
+// Run with: node tests/migration-005-parent-lead-id.test.js
 
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
 const migrationSrc = fs.readFileSync(
-  path.join(__dirname, '../migrations/005-leads-parent-lead-id.sql'),
+  path.join(__dirname, '../api/migrations/005-leads-parent-lead-id.sql'),
   'utf8'
 );
 

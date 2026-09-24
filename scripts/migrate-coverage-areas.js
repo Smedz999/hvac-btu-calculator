@@ -1,8 +1,17 @@
 // Migration script: Set default coverage_areas for existing contractors
 // Run once to backfill coverage_areas based on existing postcode prefixes
-
-const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
+//
+// Run with: node scripts/migrate-coverage-areas.js
+//
+// Deliberately kept outside api/ (see the Vercel function-count fix in
+// ACCONNX-PROGRESS.md) — this is a one-off manual script, not an HTTP
+// handler, and Vercel's zero-config detection would otherwise register it
+// as its own (unused) serverless function. @supabase/supabase-js and dotenv
+// live in api/node_modules, not a top-level node_modules, so they're
+// resolved explicitly from there.
+const path = require('path');
+const { createClient } = require(path.join(__dirname, '../api/node_modules/@supabase/supabase-js'));
+require(path.join(__dirname, '../api/node_modules/dotenv')).config({ path: path.join(__dirname, '../api/.env') });
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;

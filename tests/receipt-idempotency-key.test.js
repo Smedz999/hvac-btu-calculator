@@ -5,7 +5,7 @@
 // Offline/pure: does not touch the database, Stripe, or Resend, and does
 // not require the server to be running. Safe to run anytime.
 //
-// Run with: node api/tests/receipt-idempotency-key.test.js
+// Run with: node tests/receipt-idempotency-key.test.js
 
 const assert = require('assert');
 const fs = require('fs');
@@ -18,7 +18,7 @@ function buildIdempotencyKey(job) {
 
 function test1_SourceContainsIdempotencyKey() {
   console.log('TEST 1: receipt worker passes a deterministic idempotencyKey to resend.emails.send...');
-  const source = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../api/server.js'), 'utf8');
 
   const workerMatch = source.match(/RECEIPT WORKER[\s\S]*?app\.post\('\/api\/internal\/process-receipts'[\s\S]*?\n\}\);/);
   assert(workerMatch, 'Could not locate the receipt worker route in server.js');

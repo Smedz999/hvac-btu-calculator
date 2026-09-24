@@ -6,7 +6,7 @@
 // authorization functions are called with a small in-memory fake Supabase
 // client — this exercises the actual production logic, not a reimplementation.
 //
-// Run with: node api/tests/lead-authorization.test.js
+// Run with: node tests/lead-authorization.test.js
 
 const assert = require('assert');
 const path = require('path');
@@ -29,7 +29,7 @@ process.env.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'offline-test-admin';
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'http://127.0.0.1:0';
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'offline-test-key';
 
-const app = require(path.join(__dirname, '../server.js'));
+const app = require(path.join(__dirname, '../api/server.js'));
 const { getLeadsForUser, updateLeadForUser } = app;
 
 assert.strictEqual(typeof getLeadsForUser, 'function', 'server.js must export getLeadsForUser on app');

@@ -9,22 +9,22 @@
 // convention as api/tests/receipt-cron-auth.test.js (tests 7-9) and
 // api/tests/migration-005-parent-lead-id.test.js.
 //
-// Run with: node api/tests/migration-006-lead-credit-atomicity.test.js
+// Run with: node tests/migration-006-lead-credit-atomicity.test.js
 
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
 const migrationSrc = fs.readFileSync(
-  path.join(__dirname, '../migrations/006-lead-credit-atomicity.sql'),
+  path.join(__dirname, '../api/migrations/006-lead-credit-atomicity.sql'),
   'utf8'
 );
 const migration003Src = fs.readFileSync(
-  path.join(__dirname, '../migrations/003-payment-reservation-architecture.sql'),
+  path.join(__dirname, '../api/migrations/003-payment-reservation-architecture.sql'),
   'utf8'
 );
 const migration004Src = fs.readFileSync(
-  path.join(__dirname, '../migrations/004-receipt-job-reclaim.sql'),
+  path.join(__dirname, '../api/migrations/004-receipt-job-reclaim.sql'),
   'utf8'
 );
 

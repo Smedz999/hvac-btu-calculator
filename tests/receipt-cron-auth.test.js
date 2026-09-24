@@ -5,16 +5,16 @@
 // Offline/pure: does not touch the database, Stripe, Resend, or CRON_SECRET
 // itself, and does not require the server to be running. Safe to run anytime.
 //
-// Run with: node api/tests/receipt-cron-auth.test.js
+// Run with: node tests/receipt-cron-auth.test.js
 
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-const serverSrc = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
-const authSrc = fs.readFileSync(path.join(__dirname, '../auth.js'), 'utf8');
+const serverSrc = fs.readFileSync(path.join(__dirname, '../api/server.js'), 'utf8');
+const authSrc = fs.readFileSync(path.join(__dirname, '../api/auth.js'), 'utf8');
 const migrationSrc = fs.readFileSync(
-  path.join(__dirname, '../migrations/004-receipt-job-reclaim.sql'),
+  path.join(__dirname, '../api/migrations/004-receipt-job-reclaim.sql'),
   'utf8'
 );
 
