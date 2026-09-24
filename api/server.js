@@ -658,31 +658,101 @@ app.put('/api/companies/:id', requireAuth, async (req, res) => {
 // =====================
 // LEADS
 // =====================
+
+const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// A near-simultaneous resubmission of the same enquiry (double-click, a
+// browser's automatic retry of a timed-out request, a client-side network
+// retry) is matched by customer email + postcode within this window and
+// returned idempotently instead of creating a second lead — which would
+// otherwise notify contractors twice and consume a second credit for what
+// is really one enquiry. A genuinely new enquiry from the same person more
+// than a few minutes later is never blocked.
+//
+// Known limitation (documented, not silently assumed away): this is an
+// application-level check-then-insert, not a database-enforced constraint,
+// so it does not fully close the race between two truly simultaneous
+// requests reaching two different server instances at the exact same
+// instant — closing that completely would need a DB-level uniqueness
+// guard, which requires live-database design/testing this environment
+// cannot do (see ACCONNX-PROGRESS.md Phase 2 blocker). The blast radius of
+// that residual race is small and self-correcting (contractors would see
+// one duplicate-looking lead, not unbounded harm), unlike a payment race.
+const DUPLICATE_SUBMISSION_WINDOW_MS = 5 * 60 * 1000;
+
+// Validates input, checks for a recent duplicate submission, and creates the
+// lead — extracted from the route so it can be unit tested with a fake
+// Supabase client via dependency injection (same pattern as distributeLead()
+// and the Stripe webhook handlers). `deps.supabaseClient`/`deps.distribute`
+// default to the real module-level singleton / distributeLead — the real
+// route below never passes a second argument, so production behavior is
+// unchanged. `deps.now` defaults to the real clock and exists only so tests
+// can control the duplicate-window boundary deterministically.
+async function createLead(payload, deps = {}) {
+  const { supabaseClient = supabase, distribute = distributeLead, now = () => Date.now() } = deps;
+  const { customerName, customerEmail, customerPhone, postcode, btu, roomType, propertyType } = payload || {};
+
+  const missing = [];
+  if (!customerName || !String(customerName).trim()) missing.push('customerName');
+  if (!customerEmail || !String(customerEmail).trim()) missing.push('customerEmail');
+  if (!postcode || !String(postcode).trim()) missing.push('postcode');
+  if (missing.length > 0) {
+    return { status: 400, body: { error: `Missing required fields: ${missing.join(', ')}` } };
+  }
+  if (!EMAIL_FORMAT.test(String(customerEmail).trim())) {
+    return { status: 400, body: { error: 'Invalid email address' } };
+  }
+
+  const normalizedEmail = String(customerEmail).trim().toLowerCase();
+  const normalizedPostcode = String(postcode).trim().toUpperCase();
+  const windowStartIso = new Date(now() - DUPLICATE_SUBMISSION_WINDOW_MS).toISOString();
+
+  const { data: existing, error: dupCheckError } = await supabaseClient
+    .from('leads')
+    .select('*')
+    .eq('customer_email', normalizedEmail)
+    .eq('postcode', normalizedPostcode)
+    .gte('created_at', windowStartIso)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (dupCheckError) throw dupCheckError;
+
+  if (existing) {
+    // Idempotent: return the existing lead, do not insert again or
+    // re-distribute (that would double-notify contractors and double-spend
+    // a credit for one enquiry).
+    return { status: 200, body: { success: true, lead: existing, distributed: [], duplicate: true } };
+  }
+
+  const { data: lead, error } = await supabaseClient
+    .from('leads')
+    .insert({
+      customer_name: String(customerName).trim(),
+      customer_email: normalizedEmail,
+      customer_phone: customerPhone,
+      postcode: normalizedPostcode,
+      btu,
+      room_type: roomType,
+      property_type: propertyType,
+      status: 'new'
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  // Auto-distribute to matching companies
+  const distributed = await distribute(lead, { supabaseClient });
+
+  return { status: 200, body: { success: true, lead, distributed: distributed || [] } };
+}
+
 app.post('/api/leads', leadLimiter, async (req, res) => {
   try {
-    const { customerName, customerEmail, customerPhone, postcode, btu, roomType, propertyType, notes } = req.body;
-
-    const { data: lead, error } = await supabase
-      .from('leads')
-      .insert({
-        customer_name: customerName,
-        customer_email: customerEmail,
-        customer_phone: customerPhone,
-        postcode: postcode?.toUpperCase(),
-        btu,
-        room_type: roomType,
-        property_type: propertyType,
-        status: 'new'
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Auto-distribute to matching companies
-    const distributed = await distributeLead(lead);
-
-    res.json({ success: true, lead, distributed: distributed || [] });
+    const result = await createLead(req.body);
+    res.status(result.status).json(result.body);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1559,12 +1629,13 @@ async function sendPushToCompany(companyId, { title, body, url, tag }) {
 // Attached to the app function (not a separate module.exports shape) so the
 // Vercel entrypoint contract below is unchanged — tests reach these via
 // require('./server').getLeadsForUser / .updateLeadForUser / .distributeLead /
-// .verifyStripeWebhookSignature / .handleStripeWebhookEvent.
+// .verifyStripeWebhookSignature / .handleStripeWebhookEvent / .createLead.
 app.getLeadsForUser = getLeadsForUser;
 app.updateLeadForUser = updateLeadForUser;
 app.distributeLead = distributeLead;
 app.verifyStripeWebhookSignature = verifyStripeWebhookSignature;
 app.handleStripeWebhookEvent = handleStripeWebhookEvent;
+app.createLead = createLead;
 
 if (process.env.VERCEL) {
   module.exports = app;
